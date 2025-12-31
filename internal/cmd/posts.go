@@ -536,22 +536,8 @@ func newPostsQuoteCmd() *cobra.Command {
 				return fmt.Errorf("failed to create quote post: %w", err)
 			}
 
-			if outfmt.IsJSON(cmd.Context()) {
-				return outfmt.WriteJSON(post, jqQuery)
-			}
-
-			ui.Success("Quote post created successfully!")
-			fmt.Printf("  ID:        %s\n", post.ID)
-			fmt.Printf("  Permalink: %s\n", post.Permalink)
-			if post.Text != "" {
-				postText := post.Text
-				if len(postText) > 50 {
-					postText = postText[:50] + "..."
-				}
-				fmt.Printf("  Text:      %s\n", postText)
-			}
-
-			return nil
+			f := outfmt.FromContext(cmd.Context())
+			return f.Output(post)
 		},
 	}
 
@@ -581,15 +567,8 @@ func newPostsRepostCmd() *cobra.Command {
 				return fmt.Errorf("failed to repost: %w", err)
 			}
 
-			if outfmt.IsJSON(cmd.Context()) {
-				return outfmt.WriteJSON(post, jqQuery)
-			}
-
-			ui.Success("Reposted successfully!")
-			fmt.Printf("  ID:        %s\n", post.ID)
-			fmt.Printf("  Permalink: %s\n", post.Permalink)
-
-			return nil
+			f := outfmt.FromContext(cmd.Context())
+			return f.Output(post)
 		},
 	}
 	return cmd
