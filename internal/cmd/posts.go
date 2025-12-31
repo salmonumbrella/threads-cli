@@ -428,11 +428,15 @@ func runPostsCarousel(cmd *cobra.Command, args []string) error {
 }
 
 // detectMediaType determines if URL is image or video based on file extension
-func detectMediaType(url string) string {
-	lower := strings.ToLower(url)
+func detectMediaType(rawURL string) string {
+	lower := strings.ToLower(rawURL)
+	// Remove query parameters for extension matching
+	if idx := strings.Index(lower, "?"); idx != -1 {
+		lower = lower[:idx]
+	}
 	videoExts := []string{".mp4", ".mov", ".m4v", ".webm"}
 	for _, ext := range videoExts {
-		if strings.Contains(lower, ext) {
+		if strings.HasSuffix(lower, ext) {
 			return "VIDEO"
 		}
 	}
@@ -441,6 +445,21 @@ func detectMediaType(url string) string {
 
 // waitForContainer polls container status until ready or timeout
 func waitForContainer(ctx context.Context, client *threads.Client, containerID threads.ContainerID, timeoutSecs int) error {
+	// Check status immediately first
+	status, err := client.GetContainerStatus(ctx, containerID)
+	if err != nil {
+		return err
+	}
+	switch status.Status {
+	case "FINISHED":
+		return nil
+	case "ERROR":
+		return fmt.Errorf("container error: %s", status.ErrorMessage)
+	case "EXPIRED":
+		return fmt.Errorf("container expired")
+	}
+
+	// If not ready, start polling
 	timeout := time.After(time.Duration(timeoutSecs) * time.Second)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
