@@ -87,6 +87,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(newCompletionCmd())
 	rootCmd.AddCommand(insightsCmd)
 	rootCmd.AddCommand(meCmd)
 	rootCmd.AddCommand(postsCmd)
