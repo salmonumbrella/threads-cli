@@ -92,6 +92,7 @@ func init() {
 	rootCmd.AddCommand(newLocationsCmd())
 	rootCmd.AddCommand(meCmd)
 	rootCmd.AddCommand(postsCmd)
+	rootCmd.AddCommand(newRateLimitCmd())
 	rootCmd.AddCommand(repliesCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(usersCmd)
