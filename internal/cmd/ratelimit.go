@@ -36,17 +36,15 @@ func newRateLimitStatusCmd() *cobra.Command {
 			isLimited := client.IsRateLimited()
 			nearLimit := client.IsNearRateLimit(0.8)
 
-			f := outfmt.FromContext(cmd.Context())
-
 			if outfmt.IsJSON(cmd.Context()) {
-				return f.Output(map[string]interface{}{
+				return outfmt.WriteJSON(map[string]interface{}{
 					"is_limited": isLimited,
 					"remaining":  status.Remaining,
 					"limit":      status.Limit,
 					"reset_at":   status.ResetTime,
 					"reset_in":   status.ResetIn.String(),
 					"near_limit": nearLimit,
-				})
+				}, jqQuery)
 			}
 
 			// Text output
@@ -80,8 +78,13 @@ func newRateLimitPublishingCmd() *cobra.Command {
 				return err
 			}
 
-			f := outfmt.FromContext(cmd.Context())
-			return f.Output(limits)
+			if outfmt.IsJSON(cmd.Context()) {
+				return outfmt.WriteJSON(limits, jqQuery)
+			}
+
+			// Text output
+			fmt.Printf("%v\n", limits)
+			return nil
 		},
 	}
 	return cmd
