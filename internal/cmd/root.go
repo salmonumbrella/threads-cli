@@ -89,7 +89,7 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(newCompletionCmd())
 	rootCmd.AddCommand(insightsCmd)
-	rootCmd.AddCommand(locationsCmd)
+	rootCmd.AddCommand(newLocationsCmd())
 	rootCmd.AddCommand(meCmd)
 	rootCmd.AddCommand(postsCmd)
 	rootCmd.AddCommand(repliesCmd)
