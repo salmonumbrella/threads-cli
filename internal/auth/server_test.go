@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -470,5 +471,126 @@ func TestOAuthResult_Fields(t *testing.T) {
 	}
 	if !result.ExpiresAt.Equal(expiresAt) {
 		t.Errorf("expected ExpiresAt=%v, got %v", expiresAt, result.ExpiresAt)
+	}
+}
+
+func TestOpenBrowser_ValidURL(t *testing.T) {
+	// This test verifies openBrowser doesn't panic with a valid URL
+	// We don't actually want to open a browser, so we use a URL that won't cause issues
+	err := openBrowser("https://example.com")
+	// On CI environments without a display, this may return an error
+	// We just verify it doesn't panic
+	_ = err
+}
+
+func TestStart_ListenError(t *testing.T) {
+	// Use an invalid port to trigger listen error
+	server := NewOAuthServer("client-id", "secret", "http://[::1]:999999/callback", []string{"basic"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	_, err := server.Start(ctx)
+	if err == nil {
+		t.Error("expected error for invalid port")
+	}
+}
+
+func TestStart_ShutdownChannel(t *testing.T) {
+	server := NewOAuthServer("client-id", "secret", "http://127.0.0.1:0/callback", []string{"basic"})
+
+	// Start the server in a goroutine
+	resultChan := make(chan error, 1)
+	go func() {
+		_, err := server.Start(context.Background())
+		resultChan <- err
+	}()
+
+	// Give the server a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Close the shutdown channel
+	close(server.shutdown)
+
+	// Wait for the result
+	select {
+	case err := <-resultChan:
+		if err == nil {
+			t.Error("expected shutdown error")
+		}
+		if !strings.Contains(err.Error(), "cancelled") {
+			t.Errorf("expected cancelled error, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for shutdown")
+	}
+}
+
+func TestStart_ResultChannel(t *testing.T) {
+	server := NewOAuthServer("client-id", "secret", "http://127.0.0.1:0/callback", []string{"basic"})
+
+	// Start the server in a goroutine
+	resultChan := make(chan *OAuthResult, 1)
+	errChan := make(chan error, 1)
+	go func() {
+		result, err := server.Start(context.Background())
+		if err != nil {
+			errChan <- err
+		} else {
+			resultChan <- result
+		}
+	}()
+
+	// Give the server a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Send a result
+	expectedResult := &OAuthResult{
+		AccessToken: "test-token",
+		UserID:      "12345",
+	}
+	server.result <- expectedResult
+
+	// Wait for the result
+	select {
+	case result := <-resultChan:
+		if result.AccessToken != expectedResult.AccessToken {
+			t.Errorf("expected AccessToken=%s, got %s", expectedResult.AccessToken, result.AccessToken)
+		}
+	case err := <-errChan:
+		t.Errorf("unexpected error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for result")
+	}
+}
+
+func TestStart_ErrorChannel(t *testing.T) {
+	server := NewOAuthServer("client-id", "secret", "http://127.0.0.1:0/callback", []string{"basic"})
+
+	// Start the server in a goroutine
+	resultChan := make(chan error, 1)
+	go func() {
+		_, err := server.Start(context.Background())
+		resultChan <- err
+	}()
+
+	// Give the server a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Send an error
+	expectedErr := fmt.Errorf("test error")
+	server.errChan <- expectedErr
+
+	// Wait for the result
+	select {
+	case err := <-resultChan:
+		if err == nil {
+			t.Error("expected error")
+		}
+		if err.Error() != expectedErr.Error() {
+			t.Errorf("expected error %q, got %q", expectedErr.Error(), err.Error())
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("timeout waiting for error")
 	}
 }

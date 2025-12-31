@@ -1,6 +1,7 @@
 package threads
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -275,6 +276,36 @@ func TestPostIDTypes(t *testing.T) {
 	if userID.String() != "test-user-id" {
 		t.Errorf("Expected UserID string to be 'test-user-id', got '%s'", userID.String())
 	}
+
+	// Test ContainerID
+	containerID := ConvertToContainerID("test-container-id")
+	if !containerID.Valid() {
+		t.Error("Expected ContainerID to be valid")
+	}
+	if containerID.String() != "test-container-id" {
+		t.Errorf("Expected ContainerID string to be 'test-container-id', got '%s'", containerID.String())
+	}
+
+	// Test empty ContainerID
+	emptyContainerID := ConvertToContainerID("")
+	if emptyContainerID.Valid() {
+		t.Error("Expected empty ContainerID to be invalid")
+	}
+
+	// Test LocationID
+	locationID := ConvertToLocationID("test-location-id")
+	if !locationID.Valid() {
+		t.Error("Expected LocationID to be valid")
+	}
+	if locationID.String() != "test-location-id" {
+		t.Errorf("Expected LocationID string to be 'test-location-id', got '%s'", locationID.String())
+	}
+
+	// Test empty LocationID
+	emptyLocationID := ConvertToLocationID("")
+	if emptyLocationID.Valid() {
+		t.Error("Expected empty LocationID to be invalid")
+	}
 }
 
 func TestContainerBuilder(t *testing.T) {
@@ -442,4 +473,177 @@ func TestGIFAttachmentStruct(t *testing.T) {
 	if gif.Provider != GIFProviderTenor {
 		t.Errorf("Expected Provider to be GIFProviderTenor, got '%s'", gif.Provider)
 	}
+}
+
+func TestTimeMarshalJSON(t *testing.T) {
+	// Create a Time from a known time value
+	testTime := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
+	customTime := Time{Time: testTime}
+
+	// Marshal it
+	data, err := json.Marshal(&customTime)
+	if err != nil {
+		t.Fatalf("Failed to marshal Time: %v", err)
+	}
+
+	// The result should be RFC3339 formatted
+	expected := `"2024-06-15T10:30:00Z"`
+	if string(data) != expected {
+		t.Errorf("Expected %s, got %s", expected, string(data))
+	}
+}
+
+func TestTimeUnmarshalJSON_AllFormats(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"RFC3339", `"2024-06-15T10:30:00Z"`},
+		{"Threads format", `"2024-06-15T10:30:00+0000"`},
+		{"With offset", `"2024-06-15T10:30:00-0700"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var customTime Time
+			err := json.Unmarshal([]byte(tt.input), &customTime)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal Time: %v", err)
+			}
+			if customTime.IsZero() {
+				t.Error("Expected non-zero time")
+			}
+		})
+	}
+}
+
+func TestTimeUnmarshalJSON_FallbackToDefault(t *testing.T) {
+	// Test with a format that needs fallback to default time.Time unmarshalling
+	input := `"2024-06-15T10:30:00.000Z"` // With milliseconds
+	var customTime Time
+	err := json.Unmarshal([]byte(input), &customTime)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal Time: %v", err)
+	}
+	if customTime.IsZero() {
+		t.Error("Expected non-zero time")
+	}
+}
+
+func TestRateLimiter_NewRateLimiter(t *testing.T) {
+	rl := NewRateLimiter(&RateLimiterConfig{
+		InitialLimit: 100,
+	})
+	if rl == nil {
+		t.Fatal("NewRateLimiter returned nil")
+	}
+	if rl.limit != 100 {
+		t.Errorf("Expected limit to be 100, got %d", rl.limit)
+	}
+}
+
+func TestRateLimiter_ShouldWait(t *testing.T) {
+	rl := NewRateLimiter(&RateLimiterConfig{
+		InitialLimit: 100,
+	})
+
+	// Initially should not need to wait
+	should := rl.ShouldWait()
+	if should {
+		t.Error("ShouldWait should return false initially")
+	}
+}
+
+func TestConfig_SetDefaults(t *testing.T) {
+	config := &Config{}
+	config.SetDefaults()
+
+	if config.HTTPTimeout == 0 {
+		t.Error("SetDefaults should set HTTPTimeout")
+	}
+	if config.BaseURL == "" {
+		t.Error("SetDefaults should set BaseURL")
+	}
+	if config.UserAgent == "" {
+		t.Error("SetDefaults should set UserAgent")
+	}
+}
+
+func TestConfig_Validate(t *testing.T) {
+	validator := NewConfigValidator()
+
+	// Test with fully valid config
+	config := &Config{
+		ClientID:     "test-id",
+		ClientSecret: "test-secret",
+		RedirectURI:  "https://example.com/callback",
+		Scopes:       []string{"threads_basic"},
+		HTTPTimeout:  30 * time.Second,
+		BaseURL:      "https://graph.threads.net",
+		RetryConfig:  &RetryConfig{MaxRetries: 3, InitialDelay: time.Second, MaxDelay: 30 * time.Second, BackoffFactor: 2.0},
+	}
+
+	err := validator.Validate(config)
+	if err != nil {
+		t.Errorf("Expected valid config to pass, got: %v", err)
+	}
+
+	// Test with missing required field - empty scopes
+	config.Scopes = nil
+	err = validator.Validate(config)
+	if err == nil {
+		t.Error("Expected error for nil scopes")
+	}
+}
+
+func TestValidationMoreCases(t *testing.T) {
+	validator := NewValidator()
+
+	t.Run("ValidateCarouselChildren", func(t *testing.T) {
+		// Valid children count
+		err := validator.ValidateCarouselChildren(2)
+		if err != nil {
+			t.Errorf("Expected no error for valid children count, got: %v", err)
+		}
+
+		// Empty children (0)
+		err = validator.ValidateCarouselChildren(0)
+		if err == nil {
+			t.Error("Expected error for zero children")
+		}
+
+		// Too many children
+		err = validator.ValidateCarouselChildren(25)
+		if err == nil {
+			t.Error("Expected error for too many children")
+		}
+	})
+
+	t.Run("ValidateTopicTag", func(t *testing.T) {
+		// Valid tag
+		err := validator.ValidateTopicTag("valid")
+		if err != nil {
+			t.Errorf("Expected no error for valid tag, got: %v", err)
+		}
+
+		// Empty tag (should be valid - optional)
+		err = validator.ValidateTopicTag("")
+		if err != nil {
+			t.Errorf("Expected no error for empty tag, got: %v", err)
+		}
+	})
+
+	t.Run("ValidateMediaURL", func(t *testing.T) {
+		// Valid URL
+		err := validator.ValidateMediaURL("https://example.com/image.jpg", "image_url")
+		if err != nil {
+			t.Errorf("Expected no error for valid URL, got: %v", err)
+		}
+
+		// Empty URL
+		err = validator.ValidateMediaURL("", "image_url")
+		if err == nil {
+			t.Error("Expected error for empty URL")
+		}
+	})
 }

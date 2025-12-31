@@ -200,3 +200,34 @@ func TestMustMarkRequired_PanicsOnMissingFlag(t *testing.T) {
 
 	MustMarkRequired(cmd, "nonexistent-flag")
 }
+
+// errorReader is an io.Reader that returns EOF without a newline
+type errorReader struct{}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return strings.NewReader("").Read(p) // Returns 0, io.EOF
+}
+
+func TestConfirmOrYes_ReadError(t *testing.T) {
+	var outBuf bytes.Buffer
+	ctx := context.Background()
+	ctx = outfmt.WithFormat(ctx, "text")
+	ctx = outfmt.WithYes(ctx, false)
+	ctx = iocontext.WithIO(ctx, &iocontext.IO{
+		Out:    &outBuf,
+		ErrOut: &outBuf,
+		In:     &errorReader{}, // Will return EOF immediately without newline
+	})
+
+	oldIsTerminal := isTerminal
+	isTerminal = func() bool { return true }
+	defer func() { isTerminal = oldIsTerminal }()
+
+	_, err := ConfirmOrYes(ctx, "Delete?")
+	if err == nil {
+		t.Fatal("expected error when reading fails")
+	}
+	if !strings.Contains(err.Error(), "failed to read") {
+		t.Errorf("expected 'failed to read' in error, got: %s", err.Error())
+	}
+}

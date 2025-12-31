@@ -3,6 +3,7 @@ package outfmt
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 )
@@ -478,5 +479,339 @@ func TestFormatter_Table_JSONWithQuery(t *testing.T) {
 	// Should just output "123" (the ID of first row)
 	if output != `"123"` {
 		t.Errorf("expected \"123\", got %q", output)
+	}
+}
+
+func TestFormatter_Output_JSONWithQuery(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "json")
+	ctx = WithQuery(ctx, ".key")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	data := map[string]string{"key": "filtered_value"}
+	if err := f.Output(data); err != nil {
+		t.Fatal(err)
+	}
+
+	output := strings.TrimSpace(buf.String())
+	if output != `"filtered_value"` {
+		t.Errorf("expected \"filtered_value\", got %q", output)
+	}
+}
+
+func TestNewFormatter(t *testing.T) {
+	f := NewFormatter()
+	if f == nil {
+		t.Fatal("NewFormatter should return non-nil formatter")
+	}
+	if f.ctx == nil {
+		t.Error("NewFormatter should initialize context")
+	}
+	if f.out == nil {
+		t.Error("NewFormatter should initialize output writer")
+	}
+	if f.w == nil {
+		t.Error("NewFormatter should initialize tabwriter")
+	}
+}
+
+func TestOutput_PackageLevel(t *testing.T) {
+	t.Run("text mode calls text formatter", func(t *testing.T) {
+		ctx := WithFormat(context.Background(), "text")
+		called := false
+		err := Output(ctx, map[string]string{"key": "value"}, func() {
+			called = true
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !called {
+			t.Error("text formatter should be called in text mode")
+		}
+	})
+
+	t.Run("json mode writes json", func(t *testing.T) {
+		// This writes to stdout, so we just verify no error
+		ctx := WithFormat(context.Background(), "json")
+		called := false
+		// Redirect stdout for this test
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := Output(ctx, map[string]string{"key": "value"}, func() {
+			called = true
+		})
+
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if called {
+			t.Error("text formatter should NOT be called in json mode")
+		}
+		if !strings.Contains(buf.String(), "key") {
+			t.Error("JSON output should contain key")
+		}
+	})
+}
+
+func TestWriteJSON(t *testing.T) {
+	t.Run("without query", func(t *testing.T) {
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := WriteJSON(map[string]string{"hello": "world"}, "")
+
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(buf.String(), "hello") {
+			t.Error("JSON should contain hello")
+		}
+		if !strings.Contains(buf.String(), "world") {
+			t.Error("JSON should contain world")
+		}
+	})
+
+	t.Run("with valid query", func(t *testing.T) {
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		err := WriteJSON(map[string]string{"hello": "world"}, ".hello")
+
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		output := strings.TrimSpace(buf.String())
+		if output != `"world"` {
+			t.Errorf("expected \"world\", got %q", output)
+		}
+	})
+}
+
+func TestWriteFilteredJSON_Errors(t *testing.T) {
+	t.Run("invalid query syntax", func(t *testing.T) {
+		err := writeFilteredJSON(map[string]string{"a": "b"}, ".[invalid")
+		if err == nil {
+			t.Error("expected error for invalid query")
+		}
+		if !strings.Contains(err.Error(), "invalid jq query") {
+			t.Errorf("error should mention invalid jq query, got: %v", err)
+		}
+	})
+
+	t.Run("compile error", func(t *testing.T) {
+		// Using a query that parses but fails to compile - use $undefined variable
+		err := writeFilteredJSON(map[string]string{"a": "b"}, "$undefined")
+		if err == nil {
+			t.Error("expected error for undefined variable")
+		}
+		if !strings.Contains(err.Error(), "failed to compile") {
+			t.Errorf("error should mention compile failure, got: %v", err)
+		}
+	})
+
+	t.Run("runtime error in jq", func(t *testing.T) {
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// This will cause a runtime error (accessing non-existent key with error)
+		err := writeFilteredJSON(map[string]string{"a": "b"}, ".nonexistent | error")
+
+		_ = w.Close()
+		os.Stdout = oldStdout
+
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+
+		if err == nil {
+			t.Error("expected error from jq runtime error")
+		}
+	})
+}
+
+func TestWriteFilteredJSON_MultipleResults(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Query that returns multiple values
+	data := []map[string]string{{"id": "1"}, {"id": "2"}, {"id": "3"}}
+	err := writeFilteredJSON(data, ".[].id")
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, `"1"`) {
+		t.Error("should contain first id")
+	}
+	if !strings.Contains(output, `"2"`) {
+		t.Error("should contain second id")
+	}
+	if !strings.Contains(output, `"3"`) {
+		t.Error("should contain third id")
+	}
+}
+
+func TestPrint(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	Print("hello %s", "world")
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	if buf.String() != "hello world" {
+		t.Errorf("expected 'hello world', got %q", buf.String())
+	}
+}
+
+func TestPrintln(t *testing.T) {
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	Println("hello", "world")
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	if strings.TrimSpace(buf.String()) != "hello world" {
+		t.Errorf("expected 'hello world', got %q", buf.String())
+	}
+}
+
+func TestFormatter_WriteFilteredJSONTo_InvalidQuery(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "json")
+	ctx = WithQuery(ctx, ".[invalid")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	headers := []string{"ID"}
+	rows := [][]string{{"123"}}
+
+	err := f.Table(headers, rows, nil)
+	if err == nil {
+		t.Error("expected error for invalid query")
+	}
+	if !strings.Contains(err.Error(), "invalid jq query") {
+		t.Errorf("error should mention invalid jq query, got: %v", err)
+	}
+}
+
+func TestFormatter_WriteFilteredJSONTo_CompileError(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "json")
+	ctx = WithQuery(ctx, "$undefined")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	headers := []string{"ID"}
+	rows := [][]string{{"123"}}
+
+	err := f.Table(headers, rows, nil)
+	if err == nil {
+		t.Error("expected error for undefined variable")
+	}
+	if !strings.Contains(err.Error(), "failed to compile") {
+		t.Errorf("error should mention compile failure, got: %v", err)
+	}
+}
+
+func TestFormatter_WriteFilteredJSONTo_RuntimeError(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "json")
+	ctx = WithQuery(ctx, ".[0].ID | error")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	headers := []string{"ID"}
+	rows := [][]string{{"123"}}
+
+	err := f.Table(headers, rows, nil)
+	if err == nil {
+		t.Error("expected error from jq runtime error")
+	}
+}
+
+func TestFormatter_Output_InvalidQuery(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "json")
+	ctx = WithQuery(ctx, ".[invalid")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	err := f.Output(map[string]string{"key": "value"})
+	if err == nil {
+		t.Error("expected error for invalid query")
+	}
+}
+
+func TestColorEnabled_NoColorEnv(t *testing.T) {
+	// Test that setting NO_COLOR disables color
+	t.Setenv("NO_COLOR", "1")
+
+	var buf bytes.Buffer
+	ctx := WithFormat(context.Background(), "text")
+	f := FromContext(ctx, WithWriter(&buf))
+
+	// colorEnabled should return false due to NO_COLOR
+	if f.colorEnabled() {
+		t.Error("colorEnabled should return false when NO_COLOR is set")
+	}
+}
+
+func TestColorEnabled_WithFile(t *testing.T) {
+	// Create a temp file (not a TTY)
+	tmpFile, err := os.CreateTemp("", "outfmt_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	defer func() { _ = tmpFile.Close() }()
+
+	// Ensure NO_COLOR is not set
+	t.Setenv("NO_COLOR", "")
+
+	ctx := WithFormat(context.Background(), "text")
+	f := FromContext(ctx, WithWriter(tmpFile))
+
+	// colorEnabled should return false because file is not a TTY
+	if f.colorEnabled() {
+		t.Error("colorEnabled should return false for non-TTY file")
 	}
 }
