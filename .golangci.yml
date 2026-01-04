@@ -12,17 +12,16 @@ linters:
     - unconvert
     - unparam
     - gosec
-
-linters-settings:
-  errcheck:
-    check-blank: true
-  govet:
-    enable:
-      - shadow
-  gosec:
-    excludes:
-      - G104 # Duplicates errcheck
-      - G304 # File path from variable (expected in CLI)
+  settings:
+    errcheck:
+      check-blank: true
+    govet:
+      enable:
+        - shadow
+    gosec:
+      excludes:
+        - G104 # Duplicates errcheck
+        - G304 # File path from variable (expected in CLI)
 
 run:
   timeout: 5m
