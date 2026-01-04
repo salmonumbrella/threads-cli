@@ -235,13 +235,13 @@ func retrieveReplies(client *threads.Client, postID string) {
 	// Test reverse chronological order
 	fmt.Println("\n Testing reverse chronological order...")
 	reverse := false
-	repliesResp, err = client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	repliesResp, fetchErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
 		Limit:   10,
 		Reverse: &reverse,
 	})
 
-	if err != nil {
-		fmt.Printf(" Failed to retrieve replies in chronological order: %v\n", err)
+	if fetchErr != nil {
+		fmt.Printf(" Failed to retrieve replies in chronological order: %v\n", fetchErr)
 	} else {
 		fmt.Printf(" Retrieved %d replies in chronological order\n", len(repliesResp.Data))
 	}
@@ -384,13 +384,13 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 	if firstPage.Paging.Cursors != nil && firstPage.Paging.Cursors.After != "" {
 		fmt.Println(" Getting next page...")
 
-		nextPage, err := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+		nextPage, nextErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
 			Limit: 2,
 			After: firstPage.Paging.Cursors.After,
 		})
 
-		if err != nil {
-			fmt.Printf(" Failed to get next page: %v\n", err)
+		if nextErr != nil {
+			fmt.Printf(" Failed to get next page: %v\n", nextErr)
 		} else {
 			fmt.Printf(" Next page: %d replies\n", len(nextPage.Data))
 		}
@@ -403,13 +403,13 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 
 	// Chronological order (oldest first)
 	reverse := false
-	chronological, err := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	chronological, chronoErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
 		Limit:   5,
 		Reverse: &reverse,
 	})
 
-	if err != nil {
-		fmt.Printf(" Failed to get chronological replies: %v\n", err)
+	if chronoErr != nil {
+		fmt.Printf(" Failed to get chronological replies: %v\n", chronoErr)
 	} else {
 		fmt.Printf(" Chronological order: %d replies\n", len(chronological.Data))
 		if len(chronological.Data) > 0 {
@@ -419,13 +419,13 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 
 	// Reverse chronological order (newest first)
 	reverse = true
-	reverseChronological, err := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	reverseChronological, reverseErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
 		Limit:   5,
 		Reverse: &reverse,
 	})
 
-	if err != nil {
-		fmt.Printf(" Failed to get reverse chronological replies: %v\n", err)
+	if reverseErr != nil {
+		fmt.Printf(" Failed to get reverse chronological replies: %v\n", reverseErr)
 	} else {
 		fmt.Printf(" Reverse chronological order: %d replies\n", len(reverseChronological.Data))
 		if len(reverseChronological.Data) > 0 {

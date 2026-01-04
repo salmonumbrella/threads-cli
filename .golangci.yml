@@ -22,6 +22,16 @@ linters:
       excludes:
         - G104 # Duplicates errcheck
         - G304 # File path from variable (expected in CLI)
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+      # Examples prioritize readability over exhaustive error handling
+      - path: ^examples/
+        linters:
+          - errcheck
 
 run:
   timeout: 5m
@@ -29,8 +39,3 @@ run:
 
 issues:
   max-same-issues: 0
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
