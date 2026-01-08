@@ -14,6 +14,12 @@ import (
 	"github.com/salmonumbrella/threads-go/internal/ui"
 )
 
+const (
+	// containerPollingInterval is the time between status checks when waiting
+	// for media container processing to complete.
+	containerPollingInterval = 2 * time.Second
+)
+
 // NewPostsCmd builds the posts command group.
 func NewPostsCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -863,7 +869,7 @@ func waitForContainer(ctx context.Context, client *threads.Client, containerID t
 	}
 
 	timeout := time.After(time.Duration(timeoutSecs) * time.Second)
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(containerPollingInterval)
 	defer ticker.Stop()
 
 	for {
