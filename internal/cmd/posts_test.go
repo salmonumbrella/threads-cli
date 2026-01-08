@@ -1,6 +1,21 @@
 package cmd
 
-import "testing"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/config"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
+	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-go/internal/secrets"
+)
 
 func TestPostsCmd_Structure(t *testing.T) {
 	f := newTestFactory(t)
@@ -375,5 +390,415 @@ func TestPostsGhostListCmd_Structure(t *testing.T) {
 
 	if cmd.Long == "" {
 		t.Error("expected Long description to be set")
+	}
+}
+
+// Integration tests with mock HTTP server
+
+// mockCredentialsStore implements secrets.Store for testing
+type mockCredentialsStore struct {
+	creds *secrets.Credentials
+}
+
+func (m *mockCredentialsStore) Set(string, secrets.Credentials) error { return nil }
+func (m *mockCredentialsStore) Get(string) (*secrets.Credentials, error) {
+	return m.creds, nil
+}
+func (m *mockCredentialsStore) Delete(string) error     { return nil }
+func (m *mockCredentialsStore) List() ([]string, error) { return []string{"test-user"}, nil }
+func (m *mockCredentialsStore) Keys() ([]string, error) { return []string{"test-user"}, nil }
+
+// testCredentials returns mock credentials for testing
+func testCredentials() *secrets.Credentials {
+	return &secrets.Credentials{
+		Name:         "test-user",
+		AccessToken:  "test-access-token",
+		UserID:       "12345",
+		Username:     "testuser",
+		ExpiresAt:    time.Now().Add(24 * time.Hour),
+		CreatedAt:    time.Now(),
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		RedirectURI:  "https://example.com/callback",
+	}
+}
+
+// createMockClientFactory creates a NewClient function that uses a test server
+func createMockClientFactory(serverURL string) func(accessToken string, cfg *threads.Config) (*threads.Client, error) {
+	return func(accessToken string, cfg *threads.Config) (*threads.Client, error) {
+		// Create config with test server URL - use the captured serverURL
+		config := threads.NewConfig()
+		if cfg != nil {
+			config.ClientID = cfg.ClientID
+			config.ClientSecret = cfg.ClientSecret
+		}
+		if config.ClientID == "" {
+			config.ClientID = "test-client-id"
+		}
+		if config.ClientSecret == "" {
+			config.ClientSecret = "test-client-secret"
+		}
+		config.RedirectURI = "https://example.com/callback"
+		config.BaseURL = serverURL // Always use the test server URL
+
+		// Create client without token validation
+		client, err := threads.NewClient(config)
+		if err != nil {
+			return nil, err
+		}
+
+		// Set a valid token to bypass authentication
+		tokenInfo := &threads.TokenInfo{
+			AccessToken: accessToken,
+			TokenType:   "Bearer",
+			ExpiresAt:   time.Now().Add(time.Hour),
+			UserID:      "12345",
+			CreatedAt:   time.Now(),
+		}
+		if err := client.SetTokenInfo(tokenInfo); err != nil {
+			return nil, err
+		}
+
+		return client, nil
+	}
+}
+
+// newIntegrationTestFactory creates a factory configured for integration testing
+func newIntegrationTestFactory(t *testing.T, serverURL string) (*Factory, *iocontext.IO) {
+	t.Helper()
+
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+
+	io := &iocontext.IO{
+		Out:    outBuf,
+		ErrOut: errBuf,
+		In:     &bytes.Buffer{},
+	}
+	cfg := config.Default()
+
+	f, err := NewFactory(context.Background(), FactoryOptions{
+		IO:     io,
+		Config: cfg,
+		Store: func() (secrets.Store, error) {
+			return &mockCredentialsStore{creds: testCredentials()}, nil
+		},
+		NewClient: createMockClientFactory(serverURL),
+	})
+	if err != nil {
+		t.Fatalf("failed to create factory: %v", err)
+	}
+
+	return f, io
+}
+
+func TestPostsGet_Success(t *testing.T) {
+	// Create mock server that returns a post
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return success for any request (including refresh_access_token)
+		post := map[string]any{
+			"id":         "12345",
+			"username":   "testuser",
+			"media_type": "TEXT",
+			"text":       "Hello, world!",
+			"permalink":  "https://threads.net/t/12345",
+			"timestamp":  time.Now().Format(time.RFC3339),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(post); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	f, io := newIntegrationTestFactory(t, server.URL)
+
+	// Create and execute command
+	cmd := newPostsGetCmd(f)
+	cmd.SetArgs([]string{"12345"})
+
+	ctx := context.Background()
+	ctx = iocontext.WithIO(ctx, io)
+	cmd.SetContext(ctx)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	// Verify output contains expected data
+	output := io.Out.(*bytes.Buffer).String()
+	if !strings.Contains(output, "12345") {
+		t.Errorf("output missing post ID, got: %s", output)
+	}
+	if !strings.Contains(output, "testuser") {
+		t.Errorf("output missing username, got: %s", output)
+	}
+	if !strings.Contains(output, "TEXT") {
+		t.Errorf("output missing media type, got: %s", output)
+	}
+}
+
+func TestPostsGet_NotFound(t *testing.T) {
+	// Create mock server that returns 404
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		errResp := map[string]any{
+			"error": map[string]any{
+				"message": "Post not found",
+				"code":    100,
+				"type":    "OAuthException",
+			},
+		}
+		if err := json.NewEncoder(w).Encode(errResp); err != nil {
+			t.Errorf("failed to encode error response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	f, io := newIntegrationTestFactory(t, server.URL)
+
+	// Create and execute command
+	cmd := newPostsGetCmd(f)
+	cmd.SetArgs([]string{"nonexistent"})
+
+	ctx := context.Background()
+	ctx = iocontext.WithIO(ctx, io)
+	cmd.SetContext(ctx)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for non-existent post, got nil")
+	}
+
+	// Check that the error message indicates post not found
+	if !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "failed") {
+		t.Errorf("expected error to mention 'not found' or 'failed', got: %v", err)
+	}
+}
+
+func TestPostsGet_JSONOutput(t *testing.T) {
+	// Create mock server that returns a post
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		post := map[string]any{
+			"id":         "12345",
+			"username":   "testuser",
+			"media_type": "TEXT",
+			"text":       "Hello, world!",
+			"permalink":  "https://threads.net/t/12345",
+			"timestamp":  time.Now().Format(time.RFC3339),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(post); err != nil {
+			t.Errorf("failed to encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	f, io := newIntegrationTestFactory(t, server.URL)
+
+	// Create and execute command
+	cmd := newPostsGetCmd(f)
+	cmd.SetArgs([]string{"12345"})
+
+	// Set JSON output format via context
+	ctx := context.Background()
+	ctx = iocontext.WithIO(ctx, io)
+	ctx = outfmt.WithFormat(ctx, "json")
+	cmd.SetContext(ctx)
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	// Verify output is valid JSON
+	output := io.Out.(*bytes.Buffer).String()
+	var result map[string]any
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Errorf("output is not valid JSON: %v\nOutput: %s", err, output)
+	}
+
+	// Verify JSON contains expected fields
+	if result["id"] != "12345" {
+		t.Errorf("JSON output missing or wrong id, got: %v", result["id"])
+	}
+	if result["username"] != "testuser" {
+		t.Errorf("JSON output missing or wrong username, got: %v", result["username"])
+	}
+}
+
+func TestPostsGet_TableDriven(t *testing.T) {
+	tests := []struct {
+		name           string
+		postID         string
+		serverResponse func(w http.ResponseWriter, r *http.Request)
+		wantErr        bool
+		errContains    string
+		outputContains []string
+	}{
+		{
+			name:   "successful retrieval",
+			postID: "123456789",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				post := map[string]any{
+					"id":         "123456789",
+					"username":   "creator",
+					"media_type": "TEXT",
+					"text":       "Test post content",
+					"permalink":  "https://threads.net/t/123456789",
+					"timestamp":  time.Now().Format(time.RFC3339),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(post)
+			},
+			wantErr:        false,
+			outputContains: []string{"123456789", "creator", "TEXT"},
+		},
+		{
+			name:   "image post",
+			postID: "img123",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				post := map[string]any{
+					"id":         "img123",
+					"username":   "photographer",
+					"media_type": "IMAGE",
+					"text":       "Check out this photo",
+					"media_url":  "https://example.com/image.jpg",
+					"permalink":  "https://threads.net/t/img123",
+					"timestamp":  time.Now().Format(time.RFC3339),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(post)
+			},
+			wantErr:        false,
+			outputContains: []string{"img123", "IMAGE", "photographer"},
+		},
+		{
+			name:   "video post",
+			postID: "vid456",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				post := map[string]any{
+					"id":         "vid456",
+					"username":   "videographer",
+					"media_type": "VIDEO",
+					"text":       "New video!",
+					"media_url":  "https://example.com/video.mp4",
+					"permalink":  "https://threads.net/t/vid456",
+					"timestamp":  time.Now().Format(time.RFC3339),
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(post)
+			},
+			wantErr:        false,
+			outputContains: []string{"vid456", "VIDEO", "videographer"},
+		},
+		{
+			name:   "post not found",
+			postID: "notfound",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// For refresh_access_token, return success; for post request, return 404
+				if strings.Contains(r.URL.Path, "refresh") {
+					_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+				errResp := map[string]any{
+					"error": map[string]any{
+						"message": "Post not found",
+						"code":    100,
+					},
+				}
+				_ = json.NewEncoder(w).Encode(errResp)
+			},
+			wantErr:     true,
+			errContains: "not found",
+		},
+		{
+			name:   "unauthorized access",
+			postID: "private123",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// For refresh_access_token, return success; for post request, return 403
+				if strings.Contains(r.URL.Path, "refresh") {
+					_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+					return
+				}
+				w.WriteHeader(http.StatusForbidden)
+				errResp := map[string]any{
+					"error": map[string]any{
+						"message": "Access denied",
+						"code":    200,
+					},
+				}
+				_ = json.NewEncoder(w).Encode(errResp)
+			},
+			wantErr:     true,
+			errContains: "denied",
+		},
+		{
+			name:   "server error",
+			postID: "server500",
+			serverResponse: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// For refresh_access_token, return success; for post request, return 500
+				if strings.Contains(r.URL.Path, "refresh") {
+					_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+					return
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				errResp := map[string]any{
+					"error": map[string]any{
+						"message": "Internal server error",
+						"code":    500,
+					},
+				}
+				_ = json.NewEncoder(w).Encode(errResp)
+			},
+			wantErr:     true,
+			errContains: "api", // Matches "API is experiencing issues"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(tt.serverResponse))
+			defer server.Close()
+
+			f, io := newIntegrationTestFactory(t, server.URL)
+
+			cmd := newPostsGetCmd(f)
+			cmd.SetArgs([]string{tt.postID})
+
+			ctx := context.Background()
+			ctx = iocontext.WithIO(ctx, io)
+			cmd.SetContext(ctx)
+
+			err := cmd.Execute()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tt.errContains)
+					return
+				}
+				if tt.errContains != "" && !strings.Contains(strings.ToLower(err.Error()), tt.errContains) {
+					t.Errorf("expected error containing %q, got: %v", tt.errContains, err)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			output := io.Out.(*bytes.Buffer).String()
+			for _, contains := range tt.outputContains {
+				if !strings.Contains(output, contains) {
+					t.Errorf("output missing %q, got: %s", contains, output)
+				}
+			}
+		})
 	}
 }
