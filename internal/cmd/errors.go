@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 // UserFriendlyError wraps an error with a user-friendly message and optional suggestion.
@@ -42,31 +42,31 @@ func FormatError(err error) error {
 	}
 
 	// Check for authentication errors
-	var authErr *threads.AuthenticationError
+	var authErr *api.AuthenticationError
 	if errors.As(err, &authErr) {
 		return formatAuthError(authErr)
 	}
 
 	// Check for rate limit errors
-	var rateLimitErr *threads.RateLimitError
+	var rateLimitErr *api.RateLimitError
 	if errors.As(err, &rateLimitErr) {
 		return formatRateLimitError(rateLimitErr)
 	}
 
 	// Check for validation errors
-	var validationErr *threads.ValidationError
+	var validationErr *api.ValidationError
 	if errors.As(err, &validationErr) {
 		return formatValidationError(validationErr)
 	}
 
 	// Check for network errors
-	var networkErr *threads.NetworkError
+	var networkErr *api.NetworkError
 	if errors.As(err, &networkErr) {
 		return formatNetworkError(networkErr)
 	}
 
 	// Check for API errors
-	var apiErr *threads.APIError
+	var apiErr *api.APIError
 	if errors.As(err, &apiErr) {
 		return formatAPIError(apiErr)
 	}
@@ -76,7 +76,7 @@ func FormatError(err error) error {
 	return formatGenericError(errMsg, err)
 }
 
-func formatAuthError(err *threads.AuthenticationError) *UserFriendlyError {
+func formatAuthError(err *api.AuthenticationError) *UserFriendlyError {
 	var msg string
 	var suggestion string
 
@@ -109,7 +109,7 @@ func formatAuthError(err *threads.AuthenticationError) *UserFriendlyError {
 	}
 }
 
-func formatRateLimitError(err *threads.RateLimitError) *UserFriendlyError {
+func formatRateLimitError(err *api.RateLimitError) *UserFriendlyError {
 	msg := "Rate limit exceeded"
 	suggestion := ""
 
@@ -127,7 +127,7 @@ func formatRateLimitError(err *threads.RateLimitError) *UserFriendlyError {
 	}
 }
 
-func formatValidationError(err *threads.ValidationError) *UserFriendlyError {
+func formatValidationError(err *api.ValidationError) *UserFriendlyError {
 	msg := "Invalid input"
 	suggestion := ""
 
@@ -161,7 +161,7 @@ func formatValidationError(err *threads.ValidationError) *UserFriendlyError {
 	}
 }
 
-func formatNetworkError(err *threads.NetworkError) *UserFriendlyError {
+func formatNetworkError(err *api.NetworkError) *UserFriendlyError {
 	var msg string
 	var suggestion string
 
@@ -200,7 +200,7 @@ func formatNetworkError(err *threads.NetworkError) *UserFriendlyError {
 	}
 }
 
-func formatAPIError(err *threads.APIError) *UserFriendlyError {
+func formatAPIError(err *api.APIError) *UserFriendlyError {
 	var msg string
 	var suggestion string
 

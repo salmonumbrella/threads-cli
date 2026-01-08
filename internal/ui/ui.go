@@ -9,8 +9,8 @@ import (
 
 	"github.com/muesli/termenv"
 
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // Printer provides styled, context-aware output.

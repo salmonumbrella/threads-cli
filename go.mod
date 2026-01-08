@@ -1,4 +1,4 @@
-module github.com/salmonumbrella/threads-go
+module github.com/salmonumbrella/threads-cli
 
 go 1.24.0
 

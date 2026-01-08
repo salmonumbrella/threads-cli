@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewUsersCmd builds the users command group.
@@ -107,7 +107,7 @@ func runUsersGet(cmd *cobra.Command, f *Factory, userID string) error {
 		return err
 	}
 
-	user, err := client.GetUser(ctx, threads.UserID(userID))
+	user, err := client.GetUser(ctx, api.UserID(userID))
 	if err != nil {
 		return WrapError("failed to get user", err)
 	}
@@ -144,7 +144,7 @@ func runUsersLookup(cmd *cobra.Command, f *Factory, username string) error {
 }
 
 // userToMap converts a User to a map for JSON output
-func userToMap(u *threads.User) map[string]any {
+func userToMap(u *api.User) map[string]any {
 	return map[string]any{
 		"id":              u.ID,
 		"username":        u.Username,
@@ -156,7 +156,7 @@ func userToMap(u *threads.User) map[string]any {
 }
 
 // publicUserToMap converts a PublicUser to a map for JSON output
-func publicUserToMap(u *threads.PublicUser) map[string]any {
+func publicUserToMap(u *api.PublicUser) map[string]any {
 	return map[string]any{
 		"username":            u.Username,
 		"name":                u.Name,
@@ -173,7 +173,7 @@ func publicUserToMap(u *threads.PublicUser) map[string]any {
 }
 
 // printUserText prints a User in text format
-func printUserText(ctx context.Context, f *Factory, u *threads.User) {
+func printUserText(ctx context.Context, f *Factory, u *api.User) {
 	p := f.UI(ctx)
 	io := iocontext.GetIO(ctx)
 	p.Success("User Profile")
@@ -194,7 +194,7 @@ func printUserText(ctx context.Context, f *Factory, u *threads.User) {
 }
 
 // printPublicUserText prints a PublicUser in text format
-func printPublicUserText(ctx context.Context, f *Factory, u *threads.PublicUser) {
+func printPublicUserText(ctx context.Context, f *Factory, u *api.PublicUser) {
 	p := f.UI(ctx)
 	io := iocontext.GetIO(ctx)
 	p.Success("Public Profile")
@@ -240,12 +240,12 @@ func newUsersMentionsCmd(f *Factory) *cobra.Command {
 				return WrapError("failed to get user info", err)
 			}
 
-			opts := &threads.PaginationOptions{
+			opts := &api.PaginationOptions{
 				Limit: limit,
 				After: cursor,
 			}
 
-			result, err := client.GetUserMentions(ctx, threads.UserID(me.ID), opts)
+			result, err := client.GetUserMentions(ctx, api.UserID(me.ID), opts)
 			if err != nil {
 				return WrapError("failed to get mentions", err)
 			}

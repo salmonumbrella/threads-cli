@@ -14,7 +14,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 	fmt.Println()
 
 	// Create client from environment variables
-	client, err := threads.NewClientFromEnv()
+	client, err := api.NewClientFromEnv()
 	if err != nil {
 		log.Fatalf(" Failed to create client: %v\nMake sure to set THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, and THREADS_REDIRECT_URI", err)
 	}
@@ -99,7 +99,7 @@ func main() {
 	fmt.Println("Insights and analytics examples completed!")
 }
 
-func checkPublishingLimits(client *threads.Client) {
+func checkPublishingLimits(client *api.Client) {
 	ctx := context.Background()
 	fmt.Println(" Checking current API quota usage...")
 
@@ -144,13 +144,13 @@ func checkPublishingLimits(client *threads.Client) {
 	fmt.Printf("   Duration: %d seconds\n", limits.LocationSearchConfig.QuotaDuration)
 }
 
-func demonstratePostInsights(client *threads.Client, userID string) {
+func demonstratePostInsights(client *api.Client, userID string) {
 	fmt.Println(" Getting basic post insights...")
 
 	ctx := context.Background()
 	// First, get some posts to analyze
-	userIDTyped := threads.ConvertToUserID(userID)
-	posts, err := client.GetUserPosts(ctx, userIDTyped, &threads.PaginationOptions{
+	userIDTyped := api.ConvertToUserID(userID)
+	posts, err := client.GetUserPosts(ctx, userIDTyped, &api.PaginationOptions{
 		Limit: 5,
 	})
 	if err != nil {
@@ -179,7 +179,7 @@ func demonstratePostInsights(client *threads.Client, userID string) {
 		fmt.Println()
 
 		// Get basic insights
-		insights, err := client.GetPostInsights(context.Background(), threads.ConvertToPostID(post.ID), []string{
+		insights, err := client.GetPostInsights(context.Background(), api.ConvertToPostID(post.ID), []string{
 			"views", "likes", "replies", "reposts",
 		})
 		if err != nil {
@@ -199,13 +199,13 @@ func demonstratePostInsights(client *threads.Client, userID string) {
 	}
 }
 
-func demonstrateAdvancedPostInsights(client *threads.Client, userID string) {
+func demonstrateAdvancedPostInsights(client *api.Client, userID string) {
 	fmt.Println(" Getting advanced post insights with options...")
 
 	ctx := context.Background()
 	// Get recent posts
-	userIDTyped := threads.ConvertToUserID(userID)
-	posts, err := client.GetUserPosts(ctx, userIDTyped, &threads.PaginationOptions{
+	userIDTyped := api.ConvertToUserID(userID)
+	posts, err := client.GetUserPosts(ctx, userIDTyped, &api.PaginationOptions{
 		Limit: 3,
 	})
 	if err != nil {
@@ -228,18 +228,18 @@ func demonstrateAdvancedPostInsights(client *threads.Client, userID string) {
 	since := time.Now().Add(-30 * 24 * time.Hour) // 30 days ago
 	until := time.Now()
 
-	insights, err := client.GetPostInsightsWithOptions(context.Background(), threads.ConvertToPostID(post.ID), &threads.PostInsightsOptions{
-		Metrics: []threads.PostInsightMetric{
-			threads.PostInsightViews,
-			threads.PostInsightLikes,
-			threads.PostInsightReplies,
-			threads.PostInsightReposts,
-			threads.PostInsightQuotes,
-			threads.PostInsightShares,
-			threads.PostInsightLinkClicks,
-			threads.PostInsightProfileClicks,
+	insights, err := client.GetPostInsightsWithOptions(context.Background(), api.ConvertToPostID(post.ID), &api.PostInsightsOptions{
+		Metrics: []api.PostInsightMetric{
+			api.PostInsightViews,
+			api.PostInsightLikes,
+			api.PostInsightReplies,
+			api.PostInsightReposts,
+			api.PostInsightQuotes,
+			api.PostInsightShares,
+			api.PostInsightLinkClicks,
+			api.PostInsightProfileClicks,
 		},
-		Period: threads.InsightPeriodLifetime,
+		Period: api.InsightPeriodLifetime,
 		Since:  &since,
 		Until:  &until,
 	})
@@ -276,10 +276,10 @@ func demonstrateAdvancedPostInsights(client *threads.Client, userID string) {
 	}
 }
 
-func demonstrateAccountInsights(client *threads.Client, userID string) {
+func demonstrateAccountInsights(client *api.Client, userID string) {
 	fmt.Println(" Getting basic account insights...")
 
-	insights, err := client.GetAccountInsights(context.Background(), threads.ConvertToUserID(userID), []string{
+	insights, err := client.GetAccountInsights(context.Background(), api.ConvertToUserID(userID), []string{
 		"views", "likes", "replies", "reposts",
 	}, "lifetime")
 	if err != nil {
@@ -305,23 +305,23 @@ func demonstrateAccountInsights(client *threads.Client, userID string) {
 	}
 }
 
-func demonstrateAdvancedAccountInsights(client *threads.Client, userID string) {
+func demonstrateAdvancedAccountInsights(client *api.Client, userID string) {
 	fmt.Println(" Getting advanced account insights...")
 
 	// Test with time range (30 days ago to now)
 	since := time.Now().Add(-30 * 24 * time.Hour)
 	until := time.Now()
 
-	insights, err := client.GetAccountInsightsWithOptions(context.Background(), threads.ConvertToUserID(userID), &threads.AccountInsightsOptions{
-		Metrics: []threads.AccountInsightMetric{
-			threads.AccountInsightViews,
-			threads.AccountInsightLikes,
-			threads.AccountInsightReplies,
-			threads.AccountInsightReposts,
-			threads.AccountInsightQuotes,
-			threads.AccountInsightClicks,
+	insights, err := client.GetAccountInsightsWithOptions(context.Background(), api.ConvertToUserID(userID), &api.AccountInsightsOptions{
+		Metrics: []api.AccountInsightMetric{
+			api.AccountInsightViews,
+			api.AccountInsightLikes,
+			api.AccountInsightReplies,
+			api.AccountInsightReposts,
+			api.AccountInsightQuotes,
+			api.AccountInsightClicks,
 		},
-		Period: threads.InsightPeriodLifetime,
+		Period: api.InsightPeriodLifetime,
 		Since:  &since,
 		Until:  &until,
 	})
@@ -352,7 +352,7 @@ func demonstrateAdvancedAccountInsights(client *threads.Client, userID string) {
 	}
 }
 
-func demonstrateFollowerDemographics(client *threads.Client, userID string) {
+func demonstrateFollowerDemographics(client *api.Client, userID string) {
 	fmt.Println(" Getting follower demographics...")
 
 	// Test different demographic breakdowns
@@ -361,11 +361,11 @@ func demonstrateFollowerDemographics(client *threads.Client, userID string) {
 	for _, breakdown := range breakdowns {
 		fmt.Printf("\n Follower demographics by %s:\n", breakdown)
 
-		insights, err := client.GetAccountInsightsWithOptions(context.Background(), threads.ConvertToUserID(userID), &threads.AccountInsightsOptions{
-			Metrics: []threads.AccountInsightMetric{
-				threads.AccountInsightFollowerDemographics,
+		insights, err := client.GetAccountInsightsWithOptions(context.Background(), api.ConvertToUserID(userID), &api.AccountInsightsOptions{
+			Metrics: []api.AccountInsightMetric{
+				api.AccountInsightFollowerDemographics,
 			},
-			Period:    threads.InsightPeriodLifetime,
+			Period:    api.InsightPeriodLifetime,
 			Breakdown: breakdown,
 		})
 		if err != nil {
@@ -395,11 +395,11 @@ func demonstrateFollowerDemographics(client *threads.Client, userID string) {
 
 	// Get followers count separately (doesn't support time filtering)
 	fmt.Printf("\n👥 Current followers count:\n")
-	followersInsights, err := client.GetAccountInsightsWithOptions(context.Background(), threads.ConvertToUserID(userID), &threads.AccountInsightsOptions{
-		Metrics: []threads.AccountInsightMetric{
-			threads.AccountInsightFollowersCount,
+	followersInsights, err := client.GetAccountInsightsWithOptions(context.Background(), api.ConvertToUserID(userID), &api.AccountInsightsOptions{
+		Metrics: []api.AccountInsightMetric{
+			api.AccountInsightFollowersCount,
 		},
-		Period: threads.InsightPeriodLifetime,
+		Period: api.InsightPeriodLifetime,
 	})
 
 	if err != nil {
@@ -415,7 +415,7 @@ func demonstrateFollowerDemographics(client *threads.Client, userID string) {
 	}
 }
 
-func showAvailableOptions(client *threads.Client) {
+func showAvailableOptions(client *api.Client) {
 	fmt.Println(" Available insights options:")
 	fmt.Println()
 
@@ -451,15 +451,15 @@ func showAvailableOptions(client *threads.Client) {
 	}
 }
 
-func demonstrateInsightsErrorHandling(client *threads.Client) {
+func demonstrateInsightsErrorHandling(client *api.Client) {
 	fmt.Println(" Testing insights error handling...")
 
 	// Test 1: Invalid post ID
 	fmt.Println("\n Test 1: Invalid post ID")
-	_, err := client.GetPostInsights(context.Background(), threads.ConvertToPostID("invalid_post_id"), []string{"views"})
+	_, err := client.GetPostInsights(context.Background(), api.ConvertToPostID("invalid_post_id"), []string{"views"})
 	if err != nil {
 		fmt.Printf(" Correctly caught error: %v\n", err)
-		if threads.IsValidationError(err) {
+		if api.IsValidationError(err) {
 			fmt.Println("    Validation error - post not found")
 		}
 	}
@@ -468,20 +468,20 @@ func demonstrateInsightsErrorHandling(client *threads.Client) {
 	fmt.Println("\n Test 2: Invalid metric")
 	ctx := context.Background()
 	me, _ := client.GetMe(ctx)
-	_, err = client.GetAccountInsights(context.Background(), threads.ConvertToUserID(me.ID), []string{"invalid_metric"}, "lifetime")
+	_, err = client.GetAccountInsights(context.Background(), api.ConvertToUserID(me.ID), []string{"invalid_metric"}, "lifetime")
 	if err != nil {
 		fmt.Printf(" Correctly caught error: %v\n", err)
-		if threads.IsValidationError(err) {
+		if api.IsValidationError(err) {
 			fmt.Println("    Validation error - invalid metric")
 		}
 	}
 
 	// Test 3: Invalid period
 	fmt.Println("\n Test 3: Invalid period")
-	_, err = client.GetAccountInsights(context.Background(), threads.ConvertToUserID(me.ID), []string{"views"}, "invalid_period")
+	_, err = client.GetAccountInsights(context.Background(), api.ConvertToUserID(me.ID), []string{"views"}, "invalid_period")
 	if err != nil {
 		fmt.Printf(" Correctly caught error: %v\n", err)
-		if threads.IsValidationError(err) {
+		if api.IsValidationError(err) {
 			fmt.Println("    Validation error - invalid period")
 		}
 	}
@@ -491,15 +491,15 @@ func demonstrateInsightsErrorHandling(client *threads.Client) {
 	since := time.Now()
 	until := time.Now().Add(-24 * time.Hour) // Until is before since
 
-	_, err = client.GetAccountInsightsWithOptions(context.Background(), threads.ConvertToUserID(me.ID), &threads.AccountInsightsOptions{
-		Metrics: []threads.AccountInsightMetric{threads.AccountInsightViews},
-		Period:  threads.InsightPeriodLifetime,
+	_, err = client.GetAccountInsightsWithOptions(context.Background(), api.ConvertToUserID(me.ID), &api.AccountInsightsOptions{
+		Metrics: []api.AccountInsightMetric{api.AccountInsightViews},
+		Period:  api.InsightPeriodLifetime,
 		Since:   &since,
 		Until:   &until,
 	})
 	if err != nil {
 		fmt.Printf(" Correctly caught error: %v\n", err)
-		if threads.IsValidationError(err) {
+		if api.IsValidationError(err) {
 			fmt.Println("    Validation error - invalid date range")
 		}
 	}

@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 	accessTokenFromEnv := os.Getenv("THREADS_ACCESS_TOKEN")
 
 	if accessTokenFromEnv != "" {
-		config := &threads.Config{
+		config := &api.Config{
 			ClientID:     os.Getenv("THREADS_CLIENT_ID"),
 			ClientSecret: os.Getenv("THREADS_CLIENT_SECRET"),
 			RedirectURI:  os.Getenv("THREADS_REDIRECT_URI"),
@@ -38,12 +38,12 @@ func main() {
 		if config.ClientID == "" || config.ClientSecret == "" || config.RedirectURI == "" {
 			fmt.Println("Please set THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, and THREADS_REDIRECT_URI")
 		} else {
-			client, err := threads.NewClientWithToken(accessTokenFromEnv, config)
+			client, err := api.NewClientWithToken(accessTokenFromEnv, config)
 			if err != nil {
 				fmt.Printf("Failed to create client with environment token: %v\n", err)
 
 				// Handle specific error types
-				if threads.IsAuthenticationError(err) {
+				if api.IsAuthenticationError(err) {
 					fmt.Println("The access token might be invalid or expired")
 				}
 			} else {
@@ -70,7 +70,7 @@ func main() {
 		return
 	}
 
-	config := &threads.Config{
+	config := &api.Config{
 		ClientID:     os.Getenv("THREADS_CLIENT_ID"),
 		ClientSecret: os.Getenv("THREADS_CLIENT_SECRET"),
 		RedirectURI:  os.Getenv("THREADS_REDIRECT_URI"),
@@ -82,14 +82,14 @@ func main() {
 		return
 	}
 
-	client, err := threads.NewClientWithToken(accessToken, config)
+	client, err := api.NewClientWithToken(accessToken, config)
 	if err != nil {
 		fmt.Printf("Failed to create client with token: %v\n", err)
 
 		// Handle specific error types
-		if threads.IsAuthenticationError(err) {
+		if api.IsAuthenticationError(err) {
 			fmt.Println("The access token might be invalid or expired")
-		} else if threads.IsValidationError(err) {
+		} else if api.IsValidationError(err) {
 			fmt.Println("There might be an issue with the token format or configuration")
 		}
 		return
@@ -99,7 +99,7 @@ func main() {
 	demonstrateUsage(client)
 }
 
-func demonstrateUsage(client *threads.Client) {
+func demonstrateUsage(client *api.Client) {
 	ctx := context.Background()
 	fmt.Println()
 	fmt.Println("Demonstrating client usage:")
@@ -134,8 +134,8 @@ func demonstrateUsage(client *threads.Client) {
 
 	// Test 3: Get recent posts
 	fmt.Println("\n3. Getting recent posts...")
-	userID := threads.ConvertToUserID(user.ID)
-	posts, err := client.GetUserPosts(ctx, userID, &threads.PaginationOptions{
+	userID := api.ConvertToUserID(user.ID)
+	posts, err := client.GetUserPosts(ctx, userID, &api.PaginationOptions{
 		Limit: 5,
 	})
 	if err != nil {

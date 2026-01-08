@@ -3,9 +3,9 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewLocationsCmd builds the locations command group.
@@ -105,7 +105,7 @@ func newLocationsGetCmd(f *Factory) *cobra.Command {
 				return err
 			}
 
-			location, err := client.GetLocation(ctx, threads.LocationID(locationID))
+			location, err := client.GetLocation(ctx, api.LocationID(locationID))
 			if err != nil {
 				return WrapError("failed to get location", err)
 			}

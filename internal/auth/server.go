@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 // OAuthResult contains the result of OAuth authentication
@@ -143,7 +143,7 @@ func (s *OAuthServer) buildAuthURL() string {
 		"response_type": {"code"},
 		"state":         {s.csrfToken},
 	}
-	return fmt.Sprintf("https://www.threads.net/oauth/authorize?%s", params.Encode())
+	return fmt.Sprintf("https://www.api.net/oauth/authorize?%s", params.Encode())
 }
 
 func (s *OAuthServer) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -200,14 +200,14 @@ func (s *OAuthServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *OAuthServer) exchangeCodeForToken(code string) (*OAuthResult, error) {
-	config := &threads.Config{
+	config := &api.Config{
 		ClientID:     s.clientID,
 		ClientSecret: s.clientSecret,
 		RedirectURI:  s.redirectURI,
 		Scopes:       s.scopes,
 	}
 
-	client, err := threads.NewClient(config)
+	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}

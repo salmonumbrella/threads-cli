@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewWebhooksCmd builds the webhooks command group.
@@ -87,15 +87,15 @@ Supported events:
 				}
 			}
 
-			var webhookEvents []threads.WebhookEventType
+			var webhookEvents []api.WebhookEventType
 			for _, event := range events {
 				switch strings.ToLower(event) {
 				case "mentions":
-					webhookEvents = append(webhookEvents, threads.WebhookEventMentions)
+					webhookEvents = append(webhookEvents, api.WebhookEventMentions)
 				case "publishes":
-					webhookEvents = append(webhookEvents, threads.WebhookEventPublishes)
+					webhookEvents = append(webhookEvents, api.WebhookEventPublishes)
 				case "deletes":
-					webhookEvents = append(webhookEvents, threads.WebhookEventDeletes)
+					webhookEvents = append(webhookEvents, api.WebhookEventDeletes)
 				default:
 					return &UserFriendlyError{
 						Message:    fmt.Sprintf("Invalid event type: %s", event),
@@ -109,7 +109,7 @@ Supported events:
 				return err
 			}
 
-			opts := &threads.WebhookSubscribeOptions{
+			opts := &api.WebhookSubscribeOptions{
 				CallbackURL: callbackURL,
 				VerifyToken: verifyToken,
 				Fields:      webhookEvents,
@@ -259,7 +259,7 @@ After deletion, your callback URL will no longer receive events for this subscri
 }
 
 // webhookSubscriptionToMap converts a WebhookSubscription to a map for JSON output
-func webhookSubscriptionToMap(sub *threads.WebhookSubscription) map[string]any {
+func webhookSubscriptionToMap(sub *api.WebhookSubscription) map[string]any {
 	fields := make([]string, len(sub.Fields))
 	for i, f := range sub.Fields {
 		fields[i] = f.Name
@@ -276,7 +276,7 @@ func webhookSubscriptionToMap(sub *threads.WebhookSubscription) map[string]any {
 }
 
 // formatWebhookFields formats webhook fields for display
-func formatWebhookFields(fields []threads.WebhookField) string {
+func formatWebhookFields(fields []api.WebhookField) string {
 	if len(fields) == 0 {
 		return "-"
 	}

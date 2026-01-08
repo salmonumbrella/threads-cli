@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func TestUsersCmd_Structure(t *testing.T) {
@@ -135,7 +135,7 @@ func TestMeCmd_IsTopLevelAlias(t *testing.T) {
 }
 
 func TestUserToMap(t *testing.T) {
-	user := &threads.User{
+	user := &api.User{
 		ID:            "12345",
 		Username:      "testuser",
 		Name:          "Test User",
@@ -167,7 +167,7 @@ func TestUserToMap(t *testing.T) {
 }
 
 func TestPublicUserToMap(t *testing.T) {
-	user := &threads.PublicUser{
+	user := &api.PublicUser{
 		Username:          "publicuser",
 		Name:              "Public User",
 		ProfilePictureURL: "https://example.com/public.jpg",

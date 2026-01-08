@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 func TestWebhooksCmd_Structure(t *testing.T) {

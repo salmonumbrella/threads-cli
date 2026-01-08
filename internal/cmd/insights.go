@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewInsightsCmd builds the insights command group.
@@ -67,7 +67,7 @@ func runInsightsPost(cmd *cobra.Command, f *Factory, opts *insightsPostOptions, 
 		return err
 	}
 
-	insights, err := client.GetPostInsights(ctx, threads.PostID(postID), opts.Metrics)
+	insights, err := client.GetPostInsights(ctx, api.PostID(postID), opts.Metrics)
 	if err != nil {
 		return WrapError("failed to get post insights", err)
 	}
@@ -178,19 +178,19 @@ func runInsightsAccount(cmd *cobra.Command, f *Factory, opts *insightsAccountOpt
 		return WrapError("failed to get user info", err)
 	}
 
-	optsReq := &threads.AccountInsightsOptions{
+	optsReq := &api.AccountInsightsOptions{
 		Breakdown: opts.Breakdown,
 	}
 
 	for _, m := range opts.Metrics {
-		optsReq.Metrics = append(optsReq.Metrics, threads.AccountInsightMetric(m))
+		optsReq.Metrics = append(optsReq.Metrics, api.AccountInsightMetric(m))
 	}
 
 	if opts.Period != "" {
-		optsReq.Period = threads.InsightPeriod(opts.Period)
+		optsReq.Period = api.InsightPeriod(opts.Period)
 	}
 
-	insights, err := client.GetAccountInsightsWithOptions(ctx, threads.UserID(user.ID), optsReq)
+	insights, err := client.GetAccountInsightsWithOptions(ctx, api.UserID(user.ID), optsReq)
 	if err != nil {
 		return WrapError("failed to get account insights", err)
 	}

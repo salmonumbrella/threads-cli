@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewRepliesCmd builds the replies command group.
@@ -46,12 +46,12 @@ Results are paginated and can be filtered with --limit.`,
 				return err
 			}
 
-			opts := &threads.RepliesOptions{}
+			opts := &api.RepliesOptions{}
 			if limit > 0 {
 				opts.Limit = limit
 			}
 
-			replies, err := client.GetReplies(ctx, threads.PostID(postID), opts)
+			replies, err := client.GetReplies(ctx, api.PostID(postID), opts)
 			if err != nil {
 				return WrapError("failed to get replies", err)
 			}
@@ -114,10 +114,10 @@ Provide the text of your reply with the --text flag.`,
 				return err
 			}
 
-			content := &threads.PostContent{
+			content := &api.PostContent{
 				Text: text,
 			}
-			reply, err := client.ReplyToPost(ctx, threads.PostID(postID), content)
+			reply, err := client.ReplyToPost(ctx, api.PostID(postID), content)
 			if err != nil {
 				return WrapError("failed to create reply", err)
 			}
@@ -156,7 +156,7 @@ You can only hide replies on posts that you own.`,
 				return err
 			}
 
-			if err := client.HideReply(ctx, threads.PostID(replyID)); err != nil {
+			if err := client.HideReply(ctx, api.PostID(replyID)); err != nil {
 				return WrapError("failed to hide reply", err)
 			}
 
@@ -182,7 +182,7 @@ func newRepliesUnhideCmd(f *Factory) *cobra.Command {
 				return err
 			}
 
-			if err := client.UnhideReply(ctx, threads.PostID(replyID)); err != nil {
+			if err := client.UnhideReply(ctx, api.PostID(replyID)); err != nil {
 				return WrapError("failed to unhide reply", err)
 			}
 
@@ -212,12 +212,12 @@ Returns all replies in the conversation in a flattened format.`,
 				return err
 			}
 
-			opts := &threads.RepliesOptions{}
+			opts := &api.RepliesOptions{}
 			if limit > 0 {
 				opts.Limit = limit
 			}
 
-			result, err := client.GetConversation(ctx, threads.PostID(postID), opts)
+			result, err := client.GetConversation(ctx, api.PostID(postID), opts)
 			if err != nil {
 				return WrapError("failed to get conversation", err)
 			}

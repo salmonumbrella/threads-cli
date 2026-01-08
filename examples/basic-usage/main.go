@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func main() {
@@ -19,12 +19,12 @@ func main() {
 	// export THREADS_CLIENT_SECRET="your-client-secret"
 	// export THREADS_REDIRECT_URI="https://yourapp.com/callback"
 
-	client, err := threads.NewClientFromEnv()
+	client, err := api.NewClientFromEnv()
 	if err != nil {
 		log.Printf("Failed to create client from env (this is expected in demo): %v", err)
 
 		// Fallback: Create client manually for demo
-		config := &threads.Config{
+		config := &api.Config{
 			ClientID:     getEnvOrDefault("THREADS_CLIENT_ID", "your-client-id"),
 			ClientSecret: getEnvOrDefault("THREADS_CLIENT_SECRET", "your-client-secret"),
 			RedirectURI:  getEnvOrDefault("THREADS_REDIRECT_URI", "https://yourapp.com/callback"),
@@ -32,7 +32,7 @@ func main() {
 			HTTPTimeout:  30 * time.Second,
 		}
 
-		client, err = threads.NewClient(config)
+		client, err = api.NewClient(config)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -55,7 +55,7 @@ func main() {
 
 	accessToken := os.Getenv("THREADS_ACCESS_TOKEN")
 	if accessToken != "" {
-		clientWithToken, err := threads.NewClientWithToken(accessToken, &threads.Config{
+		clientWithToken, err := api.NewClientWithToken(accessToken, &api.Config{
 			ClientID:     getEnvOrDefault("THREADS_CLIENT_ID", "your-client-id"),
 			ClientSecret: getEnvOrDefault("THREADS_CLIENT_SECRET", "your-client-secret"),
 			RedirectURI:  getEnvOrDefault("THREADS_REDIRECT_URI", "https://yourapp.com/callback"),
@@ -95,15 +95,15 @@ func main() {
 
 	fmt.Println("Text post:")
 	fmt.Printf(`
-post, err := client.CreateTextPost(ctx, &threads.TextPostContent{
+post, err := client.CreateTextPost(ctx, &api.TextPostContent{
     Text:         "Hello from Go SDK!",
-    ReplyControl: threads.ReplyControlEveryone,
+    ReplyControl: api.ReplyControlEveryone,
 })
 `)
 
 	fmt.Println("Image post:")
 	fmt.Printf(`
-post, err := client.CreateImagePost(ctx, &threads.ImagePostContent{
+post, err := client.CreateImagePost(ctx, &api.ImagePostContent{
     Text:     "Check out this image!",
     ImageURL: "https://example.com/image.jpg",
     AltText:  "A beautiful sunset",
@@ -112,7 +112,7 @@ post, err := client.CreateImagePost(ctx, &threads.ImagePostContent{
 
 	fmt.Println("Quote post:")
 	fmt.Printf(`
-post, err := client.CreateQuotePost(ctx, &threads.QuotePostContent{
+post, err := client.CreateQuotePost(ctx, &api.QuotePostContent{
     Text:         "Adding my thoughts to this",
     QuotedPostID: "existing_post_id",
 })
@@ -124,15 +124,15 @@ post, err := client.CreateQuotePost(ctx, &threads.QuotePostContent{
 	fmt.Printf(`
 if err != nil {
     switch {
-    case threads.IsAuthenticationError(err):
+    case api.IsAuthenticationError(err):
         log.Println("Authentication failed - check your credentials")
         
-    case threads.IsRateLimitError(err):
-        rateLimitErr := err.(*threads.RateLimitError)
+    case api.IsRateLimitError(err):
+        rateLimitErr := err.(*api.RateLimitError)
         log.Printf("Rate limited. Retry after: %%v", rateLimitErr.RetryAfter)
         
-    case threads.IsValidationError(err):
-        validationErr := err.(*threads.ValidationError)
+    case api.IsValidationError(err):
+        validationErr := err.(*api.ValidationError)
         log.Printf("Validation error in field '%%s': %%s", validationErr.Field, err.Error())
         
     default:
@@ -146,8 +146,8 @@ if err != nil {
 
 	fmt.Printf(`
 // Create iterator for user posts
-userID := threads.ConvertToUserID("user_id")
-iterator := threads.NewPostIterator(client, userID, &threads.PostsOptions{
+userID := api.ConvertToUserID("user_id")
+iterator := api.NewPostIterator(client, userID, &api.PostsOptions{
     Limit: 25,
 })
 

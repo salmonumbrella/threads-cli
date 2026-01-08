@@ -1,5 +1,5 @@
 // Package main demonstrates the complete OAuth 2.0 authentication flow
-// for the Threads API using the threads-go client library.
+// for the Threads API using the threads-cli client library.
 //
 // This example shows how to:
 // 1. Set up the client with configuration
@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
-// SimpleLogger implements the threads.Logger interface for demonstration
+// SimpleLogger implements the api.Logger interface for demonstration
 type SimpleLogger struct{}
 
 func (l *SimpleLogger) Debug(msg string, fields ...any) {
@@ -69,7 +69,7 @@ type FileTokenStorage struct {
 	filepath string
 }
 
-func (f *FileTokenStorage) Store(token *threads.TokenInfo) error {
+func (f *FileTokenStorage) Store(token *api.TokenInfo) error {
 	// In a real application, you would use proper JSON marshaling
 	// and secure file permissions (0600)
 	content := fmt.Sprintf(`{
@@ -86,7 +86,7 @@ func (f *FileTokenStorage) Store(token *threads.TokenInfo) error {
 	return os.WriteFile(f.filepath, []byte(content), 0o600)
 }
 
-func (f *FileTokenStorage) Load() (*threads.TokenInfo, error) {
+func (f *FileTokenStorage) Load() (*api.TokenInfo, error) {
 	// In a real application, you would use proper JSON unmarshalling
 	// This is simplified for demonstration purposes
 	if _, err := os.Stat(f.filepath); os.IsNotExist(err) {
@@ -110,7 +110,7 @@ func main() {
 	fmt.Println("Step 1: Setting up client configuration")
 
 	// Try to create client from environment variables first
-	client, err := threads.NewClientFromEnv()
+	client, err := api.NewClientFromEnv()
 	if err != nil {
 		fmt.Printf("Could not create client from environment: %v\n", err)
 		fmt.Println("Make sure to set THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, and THREADS_REDIRECT_URI")
@@ -119,7 +119,7 @@ func main() {
 
 		// Fallback to manual configuration for demonstration
 		fmt.Println("Using manual configuration for demonstration...")
-		config := &threads.Config{
+		config := &api.Config{
 			ClientID:     "your-client-id",
 			ClientSecret: "your-client-secret",
 			RedirectURI:  "https://yourapp.com/callback",
@@ -135,7 +135,7 @@ func main() {
 			Debug:        true,
 		}
 
-		client, err = threads.NewClient(config)
+		client, err = api.NewClient(config)
 		if err != nil {
 			log.Fatalf("Failed to create client: %v", err)
 		}
@@ -188,11 +188,11 @@ func main() {
 		fmt.Printf(" Token exchange failed: %v\n", err)
 
 		// Handle different error types
-		if threads.IsAuthenticationError(err) {
+		if api.IsAuthenticationError(err) {
 			fmt.Println(" Authentication error - check your authorization code and app configuration")
-		} else if threads.IsValidationError(err) {
+		} else if api.IsValidationError(err) {
 			fmt.Println(" Validation error - the authorization code might be invalid or expired")
-		} else if threads.IsNetworkError(err) {
+		} else if api.IsNetworkError(err) {
 			fmt.Println(" Network error - check your internet connection")
 		}
 		return
@@ -219,7 +219,7 @@ func main() {
 	if err != nil {
 		fmt.Printf(" Long-lived token conversion failed: %v\n", err)
 
-		if threads.IsAuthenticationError(err) {
+		if api.IsAuthenticationError(err) {
 			fmt.Println(" The token might already be long-lived or invalid")
 		}
 	} else {
@@ -296,7 +296,7 @@ func demonstrateTokenManagement() {
 	fmt.Println("   - client.GetTokenDebugInfo() - detailed token information")
 }
 
-func demonstrateTokenManagementWithClient(client *threads.Client) {
+func demonstrateTokenManagementWithClient(client *api.Client) {
 	fmt.Println(" Current token status:")
 	fmt.Printf("   Authenticated: %t\n", client.IsAuthenticated())
 	fmt.Printf("   Expired: %t\n", client.IsTokenExpired())

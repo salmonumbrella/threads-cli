@@ -8,12 +8,12 @@ import (
 
 	"golang.org/x/term"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/config"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/secrets"
-	"github.com/salmonumbrella/threads-go/internal/ui"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/config"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/secrets"
+	"github.com/salmonumbrella/threads-cli/internal/ui"
 )
 
 // Factory provides shared dependencies and helpers for commands.
@@ -21,12 +21,12 @@ type Factory struct {
 	IO         *iocontext.IO
 	Config     *config.Config
 	Store      func() (secrets.Store, error)
-	NewClient  func(accessToken string, cfg *threads.Config) (*threads.Client, error)
+	NewClient  func(accessToken string, cfg *api.Config) (*api.Client, error)
 	Output     outfmt.Format
 	ColorMode  outfmt.ColorMode
 	Debug      bool
 	Account    string
-	debugLog   threads.Logger
+	debugLog   api.Logger
 	loggerOnce sync.Once
 }
 
@@ -35,7 +35,7 @@ type FactoryOptions struct {
 	IO        *iocontext.IO
 	Config    *config.Config
 	Store     func() (secrets.Store, error)
-	NewClient func(accessToken string, cfg *threads.Config) (*threads.Client, error)
+	NewClient func(accessToken string, cfg *api.Config) (*api.Client, error)
 }
 
 // NewFactory creates a new Factory with defaults.
@@ -63,7 +63,7 @@ func NewFactory(ctx context.Context, opts FactoryOptions) (*Factory, error) {
 
 	newClient := opts.NewClient
 	if newClient == nil {
-		newClient = threads.NewClientWithToken
+		newClient = api.NewClientWithToken
 	}
 
 	return &Factory{
@@ -86,7 +86,7 @@ func (f *Factory) UI(ctx context.Context) *ui.Printer {
 }
 
 // Client returns a Threads client for the active account.
-func (f *Factory) Client(ctx context.Context) (*threads.Client, error) {
+func (f *Factory) Client(ctx context.Context) (*api.Client, error) {
 	account, err := f.resolveAccount()
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (f *Factory) Client(ctx context.Context) (*threads.Client, error) {
 		}
 	}
 
-	cfg := &threads.Config{
+	cfg := &api.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
 		Debug:        f.Debug,
@@ -152,7 +152,7 @@ func (f *Factory) resolveAccount() (string, error) {
 	return accounts[0], nil
 }
 
-func (f *Factory) logger() threads.Logger {
+func (f *Factory) logger() api.Logger {
 	f.loggerOnce.Do(func() {
 		f.debugLog = newStderrLogger(f.IO.ErrOut)
 	})

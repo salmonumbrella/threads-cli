@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/ui"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/ui"
 )
 
 const (
@@ -156,15 +156,15 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 		}
 	}
 
-	var replyControl threads.ReplyControl
+	var replyControl api.ReplyControl
 	if opts.ReplyControl != "" {
 		switch opts.ReplyControl {
 		case "everyone":
-			replyControl = threads.ReplyControlEveryone
+			replyControl = api.ReplyControlEveryone
 		case "accounts_you_follow":
-			replyControl = threads.ReplyControlAccountsYouFollow
+			replyControl = api.ReplyControlAccountsYouFollow
 		case "mentioned_only":
-			replyControl = threads.ReplyControlMentioned
+			replyControl = api.ReplyControlMentioned
 		default:
 			return &UserFriendlyError{
 				Message:    fmt.Sprintf("Invalid reply-control value: %s", opts.ReplyControl),
@@ -173,7 +173,7 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 		}
 	}
 
-	var pollAttachment *threads.PollAttachment
+	var pollAttachment *api.PollAttachment
 	if hasPoll {
 		options := strings.Split(opts.Poll, ",")
 		for i := range options {
@@ -191,7 +191,7 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 				Suggestion: "Reduce the number of options to 4 or fewer",
 			}
 		}
-		pollAttachment = &threads.PollAttachment{
+		pollAttachment = &api.PollAttachment{
 			OptionA: options[0],
 			OptionB: options[1],
 		}
@@ -208,11 +208,11 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 		return err
 	}
 
-	var post *threads.Post
+	var post *api.Post
 
 	switch {
 	case hasImage:
-		content := &threads.ImagePostContent{
+		content := &api.ImagePostContent{
 			Text:         opts.Text,
 			ImageURL:     opts.ImageURL,
 			AltText:      opts.AltText,
@@ -223,7 +223,7 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 		}
 		post, err = client.CreateImagePost(ctx, content)
 	case hasVideo:
-		content := &threads.VideoPostContent{
+		content := &api.VideoPostContent{
 			Text:         opts.Text,
 			VideoURL:     opts.VideoURL,
 			AltText:      opts.AltText,
@@ -234,7 +234,7 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 		}
 		post, err = client.CreateVideoPost(ctx, content)
 	default:
-		content := &threads.TextPostContent{
+		content := &api.TextPostContent{
 			Text:           opts.Text,
 			ReplyTo:        opts.ReplyTo,
 			ReplyControl:   replyControl,
@@ -244,9 +244,9 @@ func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) er
 			IsGhostPost:    opts.Ghost,
 		}
 		if hasGIF {
-			content.GIFAttachment = &threads.GIFAttachment{
+			content.GIFAttachment = &api.GIFAttachment{
 				GIFID:    opts.GIF,
-				Provider: threads.GIFProviderTenor,
+				Provider: api.GIFProviderTenor,
 			}
 		}
 		post, err = client.CreateTextPost(ctx, content)
@@ -303,7 +303,7 @@ func runPostsGet(cmd *cobra.Command, f *Factory, postID string) error {
 		return err
 	}
 
-	post, err := client.GetPost(ctx, threads.PostID(postID))
+	post, err := client.GetPost(ctx, api.PostID(postID))
 	if err != nil {
 		return WrapError("failed to get post", err)
 	}
@@ -374,12 +374,12 @@ func runPostsList(cmd *cobra.Command, f *Factory, limit int) error {
 		return WrapError("failed to get user info", err)
 	}
 
-	opts := &threads.PaginationOptions{}
+	opts := &api.PaginationOptions{}
 	if limit > 0 {
 		opts.Limit = limit
 	}
 
-	postsResp, err := client.GetUserPosts(ctx, threads.UserID(me.ID), opts)
+	postsResp, err := client.GetUserPosts(ctx, api.UserID(me.ID), opts)
 	if err != nil {
 		return WrapError("failed to list posts", err)
 	}
@@ -449,7 +449,7 @@ func runPostsDelete(cmd *cobra.Command, f *Factory, postID string) error {
 		return err
 	}
 
-	post, err := client.GetPost(ctx, threads.PostID(postID))
+	post, err := client.GetPost(ctx, api.PostID(postID))
 	if err != nil {
 		return WrapError("failed to get post", err)
 	}
@@ -474,7 +474,7 @@ func runPostsDelete(cmd *cobra.Command, f *Factory, postID string) error {
 		}
 	}
 
-	if err := client.DeletePost(ctx, threads.PostID(postID)); err != nil {
+	if err := client.DeletePost(ctx, api.PostID(postID)); err != nil {
 		return WrapError("failed to delete post", err)
 	}
 
@@ -563,7 +563,7 @@ func runPostsCarousel(cmd *cobra.Command, f *Factory, opts *postsCarouselOptions
 		containerIDs = append(containerIDs, string(containerID))
 	}
 
-	content := &threads.CarouselPostContent{
+	content := &api.CarouselPostContent{
 		Text:     opts.Text,
 		Children: containerIDs,
 	}
@@ -623,17 +623,17 @@ func newPostsQuoteCmd(f *Factory) *cobra.Command {
 			var content interface{}
 			switch {
 			case videoURL != "":
-				content = &threads.VideoPostContent{
+				content = &api.VideoPostContent{
 					VideoURL: videoURL,
 					Text:     text,
 				}
 			case imageURL != "":
-				content = &threads.ImagePostContent{
+				content = &api.ImagePostContent{
 					ImageURL: imageURL,
 					Text:     text,
 				}
 			default:
-				content = &threads.TextPostContent{
+				content = &api.TextPostContent{
 					Text: text,
 				}
 			}
@@ -671,7 +671,7 @@ func newPostsRepostCmd(f *Factory) *cobra.Command {
 				return err
 			}
 
-			post, err := client.RepostPost(ctx, threads.PostID(postID))
+			post, err := client.RepostPost(ctx, api.PostID(postID))
 			if err != nil {
 				return WrapError("failed to repost", err)
 			}
@@ -718,7 +718,7 @@ Requires confirmation unless --yes flag is provided.`,
 				}
 			}
 
-			if err := client.UnrepostPost(ctx, threads.PostID(repostID)); err != nil {
+			if err := client.UnrepostPost(ctx, api.PostID(repostID)); err != nil {
 				return WrapError("failed to unrepost", err)
 			}
 
@@ -771,12 +771,12 @@ func runPostsGhostList(cmd *cobra.Command, f *Factory, limit int) error {
 		return WrapError("failed to get user info", err)
 	}
 
-	opts := &threads.PaginationOptions{}
+	opts := &api.PaginationOptions{}
 	if limit > 0 {
 		opts.Limit = limit
 	}
 
-	postsResp, err := client.GetUserGhostPosts(ctx, threads.UserID(me.ID), opts)
+	postsResp, err := client.GetUserGhostPosts(ctx, api.UserID(me.ID), opts)
 	if err != nil {
 		return WrapError("failed to list ghost posts", err)
 	}
@@ -848,7 +848,7 @@ func detectMediaType(rawURL string) string {
 }
 
 // waitForContainer polls container status until ready or timeout
-func waitForContainer(ctx context.Context, client *threads.Client, containerID threads.ContainerID, timeoutSecs int) error {
+func waitForContainer(ctx context.Context, client *api.Client, containerID api.ContainerID, timeoutSecs int) error {
 	status, err := client.GetContainerStatus(ctx, containerID)
 	if err != nil {
 		return FormatError(err)

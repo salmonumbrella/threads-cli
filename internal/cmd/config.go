@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/salmonumbrella/threads-go/internal/config"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/config"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewConfigCmd builds the config command group.
@@ -16,7 +16,7 @@ func NewConfigCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage CLI configuration",
-		Long:  `View and update local configuration defaults for threads.`,
+		Long:  `View and update local configuration defaults for api.`,
 	}
 
 	cmd.AddCommand(newConfigPathCmd())

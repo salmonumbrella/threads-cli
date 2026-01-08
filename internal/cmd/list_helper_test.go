@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // mockPost is a test type for list_helper tests
@@ -27,7 +27,7 @@ func TestNewListCommand(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID, p.Text, p.Status}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items:   []mockPost{{ID: "1", Text: "Hello", Status: "PUBLISHED"}},
 				HasMore: false,
@@ -36,7 +36,7 @@ func TestNewListCommand(t *testing.T) {
 		EmptyMessage: "No posts found",
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -57,12 +57,12 @@ func TestNewListCommand_Flags(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{}, nil
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -93,7 +93,7 @@ func TestNewListCommand_TextOutput(t *testing.T) {
 			return []string{p.ID, p.Text, p.Status}
 		},
 		ColumnTypes: []outfmt.ColumnType{outfmt.ColumnID, outfmt.ColumnPlain, outfmt.ColumnStatus},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items: []mockPost{
 					{ID: "1", Text: "Hello", Status: "PUBLISHED"},
@@ -105,7 +105,7 @@ func TestNewListCommand_TextOutput(t *testing.T) {
 		EmptyMessage: "No posts found",
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -150,7 +150,7 @@ func TestNewListCommand_JSONOutput(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID, p.Text, p.Status}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items: []mockPost{
 					{ID: "1", Text: "Hello", Status: "PUBLISHED"},
@@ -162,7 +162,7 @@ func TestNewListCommand_JSONOutput(t *testing.T) {
 		EmptyMessage: "No posts found",
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -203,7 +203,7 @@ func TestNewListCommand_EmptyResults_Text(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID, p.Text}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items:   []mockPost{},
 				HasMore: false,
@@ -212,7 +212,7 @@ func TestNewListCommand_EmptyResults_Text(t *testing.T) {
 		EmptyMessage: "No posts found",
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -247,7 +247,7 @@ func TestNewListCommand_EmptyResults_JSON(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID, p.Text}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items:   []mockPost{},
 				HasMore: false,
@@ -256,7 +256,7 @@ func TestNewListCommand_EmptyResults_JSON(t *testing.T) {
 		EmptyMessage: "No posts found",
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -295,12 +295,12 @@ func TestNewListCommand_FetchError(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{}, expectedErr
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -333,12 +333,12 @@ func TestNewListCommand_ClientError(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{}, nil
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, expectedErr
 	}
 
@@ -370,7 +370,7 @@ func TestNewListCommand_LimitAndCursor(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			capturedLimit = limit
 			capturedCursor = cursor
 			return ListResult[mockPost]{
@@ -379,7 +379,7 @@ func TestNewListCommand_LimitAndCursor(t *testing.T) {
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -417,7 +417,7 @@ func TestNewListCommand_HasMoreHint(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			return ListResult[mockPost]{
 				Items:   []mockPost{{ID: "1"}},
 				HasMore: true,
@@ -426,7 +426,7 @@ func TestNewListCommand_HasMoreHint(t *testing.T) {
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 
@@ -461,13 +461,13 @@ func TestNewListCommand_LimitMax(t *testing.T) {
 		RowFunc: func(p mockPost) []string {
 			return []string{p.ID}
 		},
-		Fetch: func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[mockPost], error) {
+		Fetch: func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[mockPost], error) {
 			capturedLimit = limit
 			return ListResult[mockPost]{Items: []mockPost{{ID: "1"}}}, nil
 		},
 	}
 
-	getClient := func(ctx context.Context) (*threads.Client, error) {
+	getClient := func(ctx context.Context) (*api.Client, error) {
 		return nil, nil
 	}
 

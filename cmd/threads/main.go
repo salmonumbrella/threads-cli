@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/salmonumbrella/threads-go/internal/cmd"
+	"github.com/salmonumbrella/threads-cli/internal/cmd"
 )
 
 func main() {

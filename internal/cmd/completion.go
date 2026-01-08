@@ -3,14 +3,14 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
 )
 
 func NewCompletionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate shell completion scripts",
-		Long: `Generate shell completion scripts for threads.
+		Long: `Generate shell completion scripts for api.
 
 To load completions:
 
@@ -33,12 +33,12 @@ Zsh:
 Fish:
   $ threads completion fish | source
   # To load completions for each session, execute once:
-  $ threads completion fish > ~/.config/fish/completions/threads.fish
+  $ threads completion fish > ~/.config/fish/completions/api.fish
 
 PowerShell:
   PS> threads completion powershell | Out-String | Invoke-Expression
   # To load completions for every new session, run:
-  PS> threads completion powershell > threads.ps1
+  PS> threads completion powershell > api.ps1
   # and source this file from your PowerShell profile.
 `,
 		DisableFlagsInUseLine: true,

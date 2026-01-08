@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/auth"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/secrets"
-	"github.com/salmonumbrella/threads-go/internal/ui"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/auth"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/secrets"
+	"github.com/salmonumbrella/threads-cli/internal/ui"
 )
 
 var defaultAuthScopes = []string{
@@ -197,7 +197,7 @@ func runAuthToken(cmd *cobra.Command, f *Factory, opts *authTokenOptions, args [
 		clientSecret = os.Getenv("THREADS_CLIENT_SECRET")
 	}
 
-	cfg := &threads.Config{
+	cfg := &api.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Debug:        f.Debug,
@@ -304,7 +304,7 @@ func runAuthRefresh(cmd *cobra.Command, f *Factory) error {
 		}
 	}
 
-	cfg := &threads.Config{
+	cfg := &api.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
 		Debug:        f.Debug,

@@ -2,8 +2,8 @@
 
 Threads in your terminal. Create posts, manage replies, view insights, search content, and automate your Threads presence.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/salmonumbrella/threads-go.svg)](https://pkg.go.dev/github.com/salmonumbrella/threads-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/salmonumbrella/threads-go)](https://goreportcard.com/report/github.com/salmonumbrella/threads-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/salmonumbrella/threads-cli.svg)](https://pkg.go.dev/github.com/salmonumbrella/threads-cli)
+[![Go Report Card](https://goreportcard.com/badge/github.com/salmonumbrella/threads-cli)](https://goreportcard.com/report/github.com/salmonumbrella/threads-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
@@ -29,12 +29,12 @@ brew install salmonumbrella/tap/threads-cli
 ### From Source
 
 ```bash
-go install github.com/salmonumbrella/threads-go/cmd/threads@latest
+go install github.com/salmonumbrella/threads-cli/cmd/threads@latest
 ```
 
 ### From Releases
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/salmonumbrella/threads-go/releases).
+Download the latest release for your platform from [GitHub Releases](https://github.com/salmonumbrella/threads-cli/releases).
 
 ## Quick Start
 
@@ -495,20 +495,20 @@ export THREADS_CLIENT_SECRET="your-app-secret"
 This CLI is built on a comprehensive Go client library:
 
 ```go
-import threads "github.com/salmonumbrella/threads-go"
+import "github.com/salmonumbrella/threads-cli/internal/api"
 
-client, err := threads.NewClientWithToken("token", &threads.Config{
+client, err := api.NewClientWithToken("token", &api.Config{
     ClientID:     "your-client-id",
     ClientSecret: "your-client-secret",
 })
 
 // Create a post
-post, err := client.CreateTextPost(ctx, &threads.TextPostContent{
+post, err := client.CreateTextPost(ctx, &api.TextPostContent{
     Text: "Hello from Go!",
 })
 ```
 
-See the [Go documentation](https://pkg.go.dev/github.com/salmonumbrella/threads-go) for full library usage.
+See the [Go documentation](https://pkg.go.dev/github.com/salmonumbrella/threads-cli) for full library usage.
 
 ## Contributing
 
@@ -521,5 +521,5 @@ MIT
 ## Links
 
 - [Threads API Documentation](https://developers.facebook.com/docs/threads)
-- [Go Package Documentation](https://pkg.go.dev/github.com/salmonumbrella/threads-go)
-- [GitHub Repository](https://github.com/salmonumbrella/threads-go)
+- [Go Package Documentation](https://pkg.go.dev/github.com/salmonumbrella/threads-cli)
+- [GitHub Repository](https://github.com/salmonumbrella/threads-cli)

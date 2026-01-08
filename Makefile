@@ -14,7 +14,7 @@ GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -ldflags "-X github.com/salmonumbrella/threads-go/internal/cmd.Version=$(VERSION) -X github.com/salmonumbrella/threads-go/internal/cmd.Commit=$(COMMIT) -X github.com/salmonumbrella/threads-go/internal/cmd.BuildDate=$(BUILD_DATE)"
+LDFLAGS := -ldflags "-X github.com/salmonumbrella/threads-cli/internal/cmd.Version=$(VERSION) -X github.com/salmonumbrella/threads-cli/internal/cmd.Commit=$(COMMIT) -X github.com/salmonumbrella/threads-cli/internal/cmd.BuildDate=$(BUILD_DATE)"
 
 build:
 	go build $(LDFLAGS) -o ./bin/threads ./cmd/threads

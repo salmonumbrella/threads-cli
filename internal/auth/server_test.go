@@ -87,7 +87,7 @@ func TestBuildAuthURL_ContainsRequiredParams(t *testing.T) {
 	}
 
 	// Check base URL
-	expectedBase := "https://www.threads.net/oauth/authorize"
+	expectedBase := "https://www.api.net/oauth/authorize"
 	actualBase := parsed.Scheme + "://" + parsed.Host + parsed.Path
 	if actualBase != expectedBase {
 		t.Errorf("expected base URL %q, got %q", expectedBase, actualBase)
@@ -262,7 +262,7 @@ func TestHandleRoot_RedirectsToAuth(t *testing.T) {
 	}
 
 	location := rec.Header().Get("Location")
-	if !strings.HasPrefix(location, "https://www.threads.net/oauth/authorize") {
+	if !strings.HasPrefix(location, "https://www.api.net/oauth/authorize") {
 		t.Errorf("expected redirect to Threads OAuth, got %q", location)
 	}
 }
@@ -445,8 +445,8 @@ func TestBuildAuthURL_URLEncoding(t *testing.T) {
 	if parsed.Scheme != "https" {
 		t.Errorf("expected https scheme, got %q", parsed.Scheme)
 	}
-	if parsed.Host != "www.threads.net" {
-		t.Errorf("expected www.threads.net host, got %q", parsed.Host)
+	if parsed.Host != "www.api.net" {
+		t.Errorf("expected www.api.net host, got %q", parsed.Host)
 	}
 }
 

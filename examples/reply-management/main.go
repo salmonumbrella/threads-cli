@@ -14,7 +14,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 	fmt.Println()
 
 	// Create client from environment variables
-	client, err := threads.NewClientFromEnv()
+	client, err := api.NewClientFromEnv()
 	if err != nil {
 		log.Fatalf(" Failed to create client: %v\nMake sure to set THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, and THREADS_REDIRECT_URI", err)
 	}
@@ -100,11 +100,11 @@ func main() {
 	fmt.Println("Reply management examples completed!")
 }
 
-func createTestPost(client *threads.Client) *threads.Post {
+func createTestPost(client *api.Client) *api.Post {
 	ctx := context.Background()
-	content := &threads.TextPostContent{
+	content := &api.TextPostContent{
 		Text:         " This is a test post for reply management examples!\n\nFeel free to reply and test the conversation features. #ThreadsAPI #Testing",
-		ReplyControl: threads.ReplyControlEveryone,
+		ReplyControl: api.ReplyControlEveryone,
 	}
 
 	post, err := client.CreateTextPost(ctx, content)
@@ -121,12 +121,12 @@ func createTestPost(client *threads.Client) *threads.Post {
 	return post
 }
 
-func createReplies(client *threads.Client, postID string) []*threads.Post {
-	var replies []*threads.Post
+func createReplies(client *api.Client, postID string) []*api.Post {
+	var replies []*api.Post
 
 	// Reply 1: Simple text reply
 	fmt.Println(" Creating simple text reply...")
-	reply1Content := &threads.PostContent{
+	reply1Content := &api.PostContent{
 		Text:    "Great post!  Thanks for sharing this with the community.",
 		ReplyTo: postID,
 	}
@@ -147,11 +147,11 @@ func createReplies(client *threads.Client, postID string) []*threads.Post {
 
 	// Reply 2: Using ReplyToPost method
 	fmt.Println("\n Creating reply using ReplyToPost method...")
-	reply2Content := &threads.PostContent{
+	reply2Content := &api.PostContent{
 		Text: " This is another reply using the ReplyToPost method. Very convenient!",
 	}
 
-	postIDTyped := threads.ConvertToPostID(postID)
+	postIDTyped := api.ConvertToPostID(postID)
 	reply2, err := client.ReplyToPost(ctx, postIDTyped, reply2Content)
 	if err != nil {
 		fmt.Printf(" Failed to create reply 2: %v\n", err)
@@ -167,7 +167,7 @@ func createReplies(client *threads.Client, postID string) []*threads.Post {
 
 	// Reply 3: Longer reply with more content
 	fmt.Println("\n Creating detailed reply...")
-	reply3Content := &threads.PostContent{
+	reply3Content := &api.PostContent{
 		Text: " This is a more detailed reply that demonstrates longer content.\n\nI'm testing the reply functionality of the Threads API, and it's working great! The threading system makes conversations easy to follow.\n\n#ThreadsAPI #Development",
 	}
 
@@ -189,10 +189,10 @@ func createReplies(client *threads.Client, postID string) []*threads.Post {
 	return replies
 }
 
-func retrieveReplies(client *threads.Client, postID string) {
+func retrieveReplies(client *api.Client, postID string) {
 	fmt.Println(" Retrieving replies with default options...")
 
-	repliesResp, err := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	repliesResp, err := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit: 25,
 	})
 	if err != nil {
@@ -235,7 +235,7 @@ func retrieveReplies(client *threads.Client, postID string) {
 	// Test reverse chronological order
 	fmt.Println("\n Testing reverse chronological order...")
 	reverse := false
-	repliesResp, fetchErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	repliesResp, fetchErr := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit:   10,
 		Reverse: &reverse,
 	})
@@ -247,10 +247,10 @@ func retrieveReplies(client *threads.Client, postID string) {
 	}
 }
 
-func getConversation(client *threads.Client, postID string) {
+func getConversation(client *api.Client, postID string) {
 	fmt.Println(" Retrieving full conversation thread...")
 
-	conversationResp, err := client.GetConversation(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	conversationResp, err := client.GetConversation(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit: 50,
 	})
 	if err != nil {
@@ -283,16 +283,16 @@ func getConversation(client *threads.Client, postID string) {
 	}
 }
 
-func moderateReplies(client *threads.Client, reply *threads.Post) {
+func moderateReplies(client *api.Client, reply *api.Post) {
 	fmt.Printf("  Testing reply moderation with reply: %s\n", reply.ID)
 
 	// Hide the reply
 	fmt.Println("\n🙈 Hiding reply...")
-	err := client.HideReply(context.Background(), threads.ConvertToPostID(reply.ID))
+	err := client.HideReply(context.Background(), api.ConvertToPostID(reply.ID))
 	if err != nil {
 		fmt.Printf(" Failed to hide reply: %v\n", err)
 
-		if threads.IsAuthenticationError(err) {
+		if api.IsAuthenticationError(err) {
 			fmt.Println(" You can only hide replies to your own posts")
 		}
 	} else {
@@ -305,11 +305,11 @@ func moderateReplies(client *threads.Client, reply *threads.Post) {
 
 	// Unhide the reply
 	fmt.Println("\n  Unhiding reply...")
-	err = client.UnhideReply(context.Background(), threads.ConvertToPostID(reply.ID))
+	err = client.UnhideReply(context.Background(), api.ConvertToPostID(reply.ID))
 	if err != nil {
 		fmt.Printf(" Failed to unhide reply: %v\n", err)
 
-		if threads.IsAuthenticationError(err) {
+		if api.IsAuthenticationError(err) {
 			fmt.Println(" You can only unhide replies to your own posts")
 		}
 	} else {
@@ -318,10 +318,10 @@ func moderateReplies(client *threads.Client, reply *threads.Post) {
 	}
 }
 
-func getUserReplyHistory(client *threads.Client, userID string) {
+func getUserReplyHistory(client *api.Client, userID string) {
 	fmt.Printf(" Retrieving reply history for user: %s\n", userID)
 
-	repliesResp, err := client.GetUserReplies(context.Background(), threads.ConvertToUserID(userID), &threads.PostsOptions{
+	repliesResp, err := client.GetUserReplies(context.Background(), api.ConvertToUserID(userID), &api.PostsOptions{
 		Limit: 20,
 	})
 	if err != nil {
@@ -363,14 +363,14 @@ func getUserReplyHistory(client *threads.Client, userID string) {
 	}
 }
 
-func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
+func demonstrateAdvancedReplyFeatures(client *api.Client, postID string) {
 	fmt.Println(" Demonstrating advanced reply features...")
 
 	// Test pagination with replies
 	fmt.Println("\n Testing reply pagination...")
 
 	// Get first page
-	firstPage, err := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	firstPage, err := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit: 2, // Small limit to test pagination
 	})
 	if err != nil {
@@ -384,7 +384,7 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 	if firstPage.Paging.Cursors != nil && firstPage.Paging.Cursors.After != "" {
 		fmt.Println(" Getting next page...")
 
-		nextPage, nextErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+		nextPage, nextErr := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 			Limit: 2,
 			After: firstPage.Paging.Cursors.After,
 		})
@@ -403,7 +403,7 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 
 	// Chronological order (oldest first)
 	reverse := false
-	chronological, chronoErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	chronological, chronoErr := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit:   5,
 		Reverse: &reverse,
 	})
@@ -419,7 +419,7 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 
 	// Reverse chronological order (newest first)
 	reverse = true
-	reverseChronological, reverseErr := client.GetReplies(context.Background(), threads.ConvertToPostID(postID), &threads.RepliesOptions{
+	reverseChronological, reverseErr := client.GetReplies(context.Background(), api.ConvertToPostID(postID), &api.RepliesOptions{
 		Limit:   5,
 		Reverse: &reverse,
 	})
@@ -437,14 +437,14 @@ func demonstrateAdvancedReplyFeatures(client *threads.Client, postID string) {
 	fmt.Println("\n Testing error handling...")
 
 	// Try to get replies for non-existent post
-	_, err = client.GetReplies(context.Background(), threads.ConvertToPostID("non_existent_post_id"), &threads.RepliesOptions{
+	_, err = client.GetReplies(context.Background(), api.ConvertToPostID("non_existent_post_id"), &api.RepliesOptions{
 		Limit: 10,
 	})
 
 	if err != nil {
 		fmt.Printf(" Correctly caught error for non-existent post: %v\n", err)
 
-		if threads.IsValidationError(err) {
+		if api.IsValidationError(err) {
 			fmt.Println("    Validation error - post not found")
 		}
 	} else {

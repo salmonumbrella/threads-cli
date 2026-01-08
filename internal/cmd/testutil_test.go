@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/config"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/secrets"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/config"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/secrets"
 )
 
 type stubStore struct{}
@@ -75,10 +75,10 @@ func testCredentials() *secrets.Credentials {
 }
 
 // createMockClientFactory creates a NewClient function that uses a test server
-func createMockClientFactory(serverURL string) func(accessToken string, cfg *threads.Config) (*threads.Client, error) {
-	return func(accessToken string, cfg *threads.Config) (*threads.Client, error) {
+func createMockClientFactory(serverURL string) func(accessToken string, cfg *api.Config) (*api.Client, error) {
+	return func(accessToken string, cfg *api.Config) (*api.Client, error) {
 		// Create config with test server URL - use the captured serverURL
-		config := threads.NewConfig()
+		config := api.NewConfig()
 		if cfg != nil {
 			config.ClientID = cfg.ClientID
 			config.ClientSecret = cfg.ClientSecret
@@ -93,13 +93,13 @@ func createMockClientFactory(serverURL string) func(accessToken string, cfg *thr
 		config.BaseURL = serverURL // Always use the test server URL
 
 		// Create client without token validation
-		client, err := threads.NewClient(config)
+		client, err := api.NewClient(config)
 		if err != nil {
 			return nil, err
 		}
 
 		// Set a valid token to bypass authentication
-		tokenInfo := &threads.TokenInfo{
+		tokenInfo := &api.TokenInfo{
 			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresAt:   time.Now().Add(time.Hour),

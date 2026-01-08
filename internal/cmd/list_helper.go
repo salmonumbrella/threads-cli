@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // ListResult is a generic struct for paginated list results
@@ -30,11 +30,11 @@ type ListConfig[T any] struct {
 	EmptyMessage string
 
 	// Fetch function - called with cursor and limit
-	Fetch func(ctx context.Context, client *threads.Client, cursor string, limit int) (ListResult[T], error)
+	Fetch func(ctx context.Context, client *api.Client, cursor string, limit int) (ListResult[T], error)
 }
 
 // NewListCommand creates a new list command using the provided configuration
-func NewListCommand[T any](cfg ListConfig[T], getClient func(context.Context) (*threads.Client, error)) *cobra.Command {
+func NewListCommand[T any](cfg ListConfig[T], getClient func(context.Context) (*api.Client, error)) *cobra.Command {
 	var limit int
 	var cursor string
 

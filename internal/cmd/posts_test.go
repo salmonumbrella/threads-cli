@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 func TestPostsCmd_Structure(t *testing.T) {
@@ -401,7 +401,7 @@ func TestPostsGet_Success(t *testing.T) {
 			"username":   "testuser",
 			"media_type": "TEXT",
 			"text":       "Hello, world!",
-			"permalink":  "https://threads.net/t/12345",
+			"permalink":  "https://api.net/t/12345",
 			"timestamp":  time.Now().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -486,7 +486,7 @@ func TestPostsGet_JSONOutput(t *testing.T) {
 			"username":   "testuser",
 			"media_type": "TEXT",
 			"text":       "Hello, world!",
-			"permalink":  "https://threads.net/t/12345",
+			"permalink":  "https://api.net/t/12345",
 			"timestamp":  time.Now().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -547,7 +547,7 @@ func TestPostsGet_TableDriven(t *testing.T) {
 					"username":   "creator",
 					"media_type": "TEXT",
 					"text":       "Test post content",
-					"permalink":  "https://threads.net/t/123456789",
+					"permalink":  "https://api.net/t/123456789",
 					"timestamp":  time.Now().Format(time.RFC3339),
 				}
 				w.Header().Set("Content-Type", "application/json")
@@ -566,7 +566,7 @@ func TestPostsGet_TableDriven(t *testing.T) {
 					"media_type": "IMAGE",
 					"text":       "Check out this photo",
 					"media_url":  "https://example.com/image.jpg",
-					"permalink":  "https://threads.net/t/img123",
+					"permalink":  "https://api.net/t/img123",
 					"timestamp":  time.Now().Format(time.RFC3339),
 				}
 				w.Header().Set("Content-Type", "application/json")
@@ -585,7 +585,7 @@ func TestPostsGet_TableDriven(t *testing.T) {
 					"media_type": "VIDEO",
 					"text":       "New video!",
 					"media_url":  "https://example.com/video.mp4",
-					"permalink":  "https://threads.net/t/vid456",
+					"permalink":  "https://api.net/t/vid456",
 					"timestamp":  time.Now().Format(time.RFC3339),
 				}
 				w.Header().Set("Content-Type", "application/json")

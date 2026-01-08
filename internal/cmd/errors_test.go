@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func TestUserFriendlyError_Error(t *testing.T) {
@@ -70,25 +70,25 @@ func TestFormatError_AuthenticationError(t *testing.T) {
 	}{
 		{
 			name:       "expired token",
-			err:        threads.NewAuthenticationError(401, "Token has expired", ""),
+			err:        api.NewAuthenticationError(401, "Token has expired", ""),
 			wantSubstr: "expired",
 			wantSugg:   "threads auth refresh",
 		},
 		{
 			name:       "invalid token",
-			err:        threads.NewAuthenticationError(401, "Invalid access token", ""),
+			err:        api.NewAuthenticationError(401, "Invalid access token", ""),
 			wantSubstr: "invalid",
 			wantSugg:   "threads auth login",
 		},
 		{
 			name:       "401 error",
-			err:        threads.NewAuthenticationError(401, "Authentication required", ""),
+			err:        api.NewAuthenticationError(401, "Authentication required", ""),
 			wantSubstr: "Authentication required",
 			wantSugg:   "threads auth login",
 		},
 		{
 			name:       "403 error",
-			err:        threads.NewAuthenticationError(403, "Access denied", ""),
+			err:        api.NewAuthenticationError(403, "Access denied", ""),
 			wantSubstr: "permission",
 			wantSugg:   "scopes",
 		},
@@ -113,7 +113,7 @@ func TestFormatError_AuthenticationError(t *testing.T) {
 }
 
 func TestFormatError_RateLimitError(t *testing.T) {
-	err := threads.NewRateLimitError(429, "Too many requests", "", 5*time.Minute)
+	err := api.NewRateLimitError(429, "Too many requests", "", 5*time.Minute)
 	formatted := FormatError(err)
 
 	ufErr, ok := formatted.(*UserFriendlyError)
@@ -138,12 +138,12 @@ func TestFormatError_ValidationError(t *testing.T) {
 	}{
 		{
 			name:       "with field",
-			err:        threads.NewValidationError(400, "Invalid value", "", "text"),
+			err:        api.NewValidationError(400, "Invalid value", "", "text"),
 			wantSubstr: "text",
 		},
 		{
 			name:       "without field",
-			err:        threads.NewValidationError(400, "Validation failed", "", ""),
+			err:        api.NewValidationError(400, "Validation failed", "", ""),
 			wantSubstr: "Validation",
 		},
 	}
@@ -171,17 +171,17 @@ func TestFormatError_NetworkError(t *testing.T) {
 	}{
 		{
 			name:       "timeout",
-			err:        threads.NewNetworkError(0, "Request timeout", "", true),
+			err:        api.NewNetworkError(0, "Request timeout", "", true),
 			wantSubstr: "timed out",
 		},
 		{
 			name:       "dns error",
-			err:        threads.NewNetworkError(0, "no such host", "", false),
+			err:        api.NewNetworkError(0, "no such host", "", false),
 			wantSubstr: "DNS",
 		},
 		{
 			name:       "temporary error",
-			err:        threads.NewNetworkError(0, "Temporary failure", "", true),
+			err:        api.NewNetworkError(0, "Temporary failure", "", true),
 			wantSubstr: "transient",
 		},
 	}
@@ -209,12 +209,12 @@ func TestFormatError_APIError(t *testing.T) {
 	}{
 		{
 			name:       "server error",
-			err:        threads.NewAPIError(500, "Internal server error", "", "req-123"),
+			err:        api.NewAPIError(500, "Internal server error", "", "req-123"),
 			wantSubstr: "server-side",
 		},
 		{
 			name:       "not found",
-			err:        threads.NewAPIError(404, "Resource not found", "", ""),
+			err:        api.NewAPIError(404, "Resource not found", "", ""),
 			wantSubstr: "not found",
 		},
 	}
@@ -280,7 +280,7 @@ func TestFormatError_Nil(t *testing.T) {
 }
 
 func TestWrapError(t *testing.T) {
-	authErr := threads.NewAuthenticationError(401, "Token expired", "")
+	authErr := api.NewAuthenticationError(401, "Token expired", "")
 	wrapped := WrapError("API call failed", authErr)
 
 	ufErr, ok := wrapped.(*UserFriendlyError)
@@ -321,7 +321,7 @@ func TestWrapError_PlainError(t *testing.T) {
 
 func TestFormatError_AuthenticationError_DefaultCase(t *testing.T) {
 	// Test the default case (not expired, not invalid, not 401, not 403)
-	err := threads.NewAuthenticationError(400, "Some other auth error", "")
+	err := api.NewAuthenticationError(400, "Some other auth error", "")
 	formatted := FormatError(err)
 
 	ufErr, ok := formatted.(*UserFriendlyError)
@@ -339,7 +339,7 @@ func TestFormatError_AuthenticationError_DefaultCase(t *testing.T) {
 }
 
 func TestFormatError_RateLimitError_NoRetryAfter(t *testing.T) {
-	err := threads.NewRateLimitError(429, "Too many requests", "", 0)
+	err := api.NewRateLimitError(429, "Too many requests", "", 0)
 	formatted := FormatError(err)
 
 	ufErr, ok := formatted.(*UserFriendlyError)
@@ -364,27 +364,27 @@ func TestFormatError_ValidationError_SpecificPatterns(t *testing.T) {
 	}{
 		{
 			name:       "text too long",
-			err:        threads.NewValidationError(400, "Text is too long", "", "text"),
+			err:        api.NewValidationError(400, "Text is too long", "", "text"),
 			wantSubstr: "500 characters",
 		},
 		{
 			name:       "invalid url",
-			err:        threads.NewValidationError(400, "URL is invalid", "", "url"),
+			err:        api.NewValidationError(400, "URL is invalid", "", "url"),
 			wantSubstr: "http://",
 		},
 		{
 			name:       "media format",
-			err:        threads.NewValidationError(400, "Unsupported media format", "", "media"),
+			err:        api.NewValidationError(400, "Unsupported media format", "", "media"),
 			wantSubstr: "JPEG",
 		},
 		{
 			name:       "carousel items",
-			err:        threads.NewValidationError(400, "Carousel has too few items", "", ""),
+			err:        api.NewValidationError(400, "Carousel has too few items", "", ""),
 			wantSubstr: "2-20",
 		},
 		{
 			name:       "empty field empty message",
-			err:        threads.NewValidationError(400, "", "", ""),
+			err:        api.NewValidationError(400, "", "", ""),
 			wantSubstr: "--help",
 		},
 	}
@@ -412,22 +412,22 @@ func TestFormatError_NetworkError_AllCases(t *testing.T) {
 	}{
 		{
 			name:       "connection refused",
-			err:        threads.NewNetworkError(0, "connection refused", "", false),
+			err:        api.NewNetworkError(0, "connection refused", "", false),
 			wantSubstr: "temporarily unavailable",
 		},
 		{
 			name:       "tls error",
-			err:        threads.NewNetworkError(0, "tls handshake error", "", false),
+			err:        api.NewNetworkError(0, "tls handshake error", "", false),
 			wantSubstr: "SSL/TLS",
 		},
 		{
 			name:       "certificate error",
-			err:        threads.NewNetworkError(0, "certificate invalid", "", false),
+			err:        api.NewNetworkError(0, "certificate invalid", "", false),
 			wantSubstr: "SSL/TLS",
 		},
 		{
 			name:       "default network error",
-			err:        threads.NewNetworkError(0, "unknown network issue", "", false),
+			err:        api.NewNetworkError(0, "unknown network issue", "", false),
 			wantSubstr: "internet connection",
 		},
 	}
@@ -455,22 +455,22 @@ func TestFormatError_APIError_AllCases(t *testing.T) {
 	}{
 		{
 			name:       "server error without request id",
-			err:        threads.NewAPIError(503, "Service unavailable", "", ""),
+			err:        api.NewAPIError(503, "Service unavailable", "", ""),
 			wantSubstr: "server-side",
 		},
 		{
 			name:       "deleted content",
-			err:        threads.NewAPIError(410, "Content has been deleted", "", ""),
+			err:        api.NewAPIError(410, "Content has been deleted", "", ""),
 			wantSubstr: "no longer exists",
 		},
 		{
 			name:       "private content",
-			err:        threads.NewAPIError(403, "Content is private", "", ""),
+			err:        api.NewAPIError(403, "Content is private", "", ""),
 			wantSubstr: "private content",
 		},
 		{
 			name:       "default error without request id",
-			err:        threads.NewAPIError(400, "Bad request", "", ""),
+			err:        api.NewAPIError(400, "Bad request", "", ""),
 			wantSubstr: "problem persists",
 		},
 	}

@@ -16,7 +16,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-cli/internal/api"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	fmt.Println()
 
 	// Create client from environment variables
-	client, err := threads.NewClientFromEnv()
+	client, err := api.NewClientFromEnv()
 	if err != nil {
 		log.Fatalf("Failed to create client: %v\nMake sure to set THREADS_CLIENT_ID, THREADS_CLIENT_SECRET, and THREADS_REDIRECT_URI", err)
 	}
@@ -92,9 +92,9 @@ func main() {
 	fmt.Println("Post creation examples completed!")
 }
 
-func createSimpleTextPost(client *threads.Client) {
+func createSimpleTextPost(client *api.Client) {
 	ctx := context.Background()
-	content := &threads.TextPostContent{
+	content := &api.TextPostContent{
 		Text: "Hello from the Threads Go client!\n\nThis is a simple text post created using the API.",
 	}
 
@@ -109,12 +109,12 @@ func createSimpleTextPost(client *threads.Client) {
 	printPostInfo(post)
 }
 
-func createAdvancedTextPost(client *threads.Client) {
+func createAdvancedTextPost(client *api.Client) {
 	ctx := context.Background()
-	content := &threads.TextPostContent{
+	content := &api.TextPostContent{
 		Text:           "Check out the Threads API documentation for developers!\n\nPerfect for building integrations and automating your Threads presence.",
 		LinkAttachment: "https://developers.facebook.com/docs/threads",
-		ReplyControl:   threads.ReplyControlAccountsYouFollow,
+		ReplyControl:   api.ReplyControlAccountsYouFollow,
 		TopicTag:       "ThreadsAPI",
 		// AutoPublishText: true, // Uncomment to use direct publishing
 	}
@@ -133,16 +133,16 @@ func createAdvancedTextPost(client *threads.Client) {
 	printPostInfo(post)
 }
 
-func createImagePost(client *threads.Client) {
+func createImagePost(client *api.Client) {
 	ctx := context.Background()
 	// Example image URL - replace with your own
 	imageURL := "https://picsum.photos/800/600?random=1"
 
-	content := &threads.ImagePostContent{
+	content := &api.ImagePostContent{
 		Text:         "Beautiful image shared via the Threads API!\n\nThis demonstrates image posting capabilities.",
 		ImageURL:     imageURL,
 		AltText:      "A randomly generated beautiful image from Picsum",
-		ReplyControl: threads.ReplyControlEveryone,
+		ReplyControl: api.ReplyControlEveryone,
 	}
 
 	post, err := client.CreateImagePost(ctx, content)
@@ -158,16 +158,16 @@ func createImagePost(client *threads.Client) {
 	printPostInfo(post)
 }
 
-func createVideoPost(client *threads.Client) {
+func createVideoPost(client *api.Client) {
 	ctx := context.Background()
 	// Example video URL - replace with your own
 	videoURL := "https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"
 
-	content := &threads.VideoPostContent{
+	content := &api.VideoPostContent{
 		Text:         "Amazing video content shared via the Threads API!\n\nVideo posts are great for engagement.",
 		VideoURL:     videoURL,
 		AltText:      "A sample video demonstrating video post capabilities",
-		ReplyControl: threads.ReplyControlEveryone,
+		ReplyControl: api.ReplyControlEveryone,
 	}
 
 	fmt.Println("⏳ Creating video post (this may take longer due to processing)...")
@@ -185,7 +185,7 @@ func createVideoPost(client *threads.Client) {
 	printPostInfo(post)
 }
 
-func createCarouselPost(_ *threads.Client) {
+func createCarouselPost(_ *api.Client) {
 	fmt.Println(" Note: Carousel posts require pre-created container IDs")
 	fmt.Println("   In a real application, you would:")
 	fmt.Println("   1. Create individual media containers first")
@@ -197,14 +197,14 @@ func createCarouselPost(_ *threads.Client) {
 	// container2, err := client.createVideoContainer(...)
 
 	// For demonstration, we'll show what the call would look like
-	content := &threads.CarouselPostContent{
+	content := &api.CarouselPostContent{
 		Text: "Amazing carousel post with multiple media items!\n\nSwipe to see more content.",
 		Children: []string{
 			"container_id_1", // These would be real container IDs
 			"container_id_2",
 			"container_id_3",
 		},
-		ReplyControl: threads.ReplyControlEveryone,
+		ReplyControl: api.ReplyControlEveryone,
 	}
 
 	fmt.Printf(" Carousel post structure:\n")
@@ -225,17 +225,17 @@ func createCarouselPost(_ *threads.Client) {
 	fmt.Println(" This example shows the structure - implement container creation for full functionality")
 }
 
-func createQuotePost(_ *threads.Client) {
+func createQuotePost(_ *api.Client) {
 	fmt.Println(" Note: Quote posts require an existing post ID to quote")
 	fmt.Println("   In a real application, you would have a specific post ID")
 
 	// Example post ID - replace with a real post ID
 	quotedPostID := "example_post_id_to_quote"
 
-	content := &threads.TextPostContent{
+	content := &api.TextPostContent{
 		Text:         "Adding my thoughts to this great post!\n\nQuote posts are perfect for commentary and discussion.",
 		QuotedPostID: quotedPostID,
-		ReplyControl: threads.ReplyControlEveryone,
+		ReplyControl: api.ReplyControlEveryone,
 	}
 
 	fmt.Printf(" Quote post structure:\n")
@@ -256,7 +256,7 @@ func createQuotePost(_ *threads.Client) {
 	fmt.Println(" Replace 'example_post_id_to_quote' with a real post ID to create quote posts")
 }
 
-func createRepost(_ *threads.Client) {
+func createRepost(_ *api.Client) {
 	fmt.Println(" Note: Reposts require an existing post ID to repost")
 	fmt.Println("   This is similar to retweeting on Twitter")
 
@@ -279,13 +279,13 @@ func createRepost(_ *threads.Client) {
 	fmt.Println(" Replace 'example_post_id_to_repost' with a real post ID to create reposts")
 }
 
-func demonstrateErrorHandling(client *threads.Client) {
+func demonstrateErrorHandling(client *api.Client) {
 	ctx := context.Background()
 	fmt.Println("Testing various error scenarios...")
 
 	// Test 1: Empty text post
 	fmt.Println("\nTest 1: Empty text post")
-	emptyContent := &threads.TextPostContent{
+	emptyContent := &api.TextPostContent{
 		Text: "", // Empty text should cause validation error
 	}
 
@@ -299,7 +299,7 @@ func demonstrateErrorHandling(client *threads.Client) {
 
 	// Test 2: Invalid image URL
 	fmt.Println("\n Test 2: Invalid image URL")
-	invalidImageContent := &threads.ImagePostContent{
+	invalidImageContent := &api.ImagePostContent{
 		Text:     "Test post with invalid image",
 		ImageURL: "not-a-valid-url",
 	}
@@ -319,7 +319,7 @@ func demonstrateErrorHandling(client *threads.Client) {
 		longText += "This is a very long text post that might exceed API limits. "
 	}
 
-	longTextContent := &threads.TextPostContent{
+	longTextContent := &api.TextPostContent{
 		Text: longText,
 	}
 
@@ -334,21 +334,21 @@ func demonstrateErrorHandling(client *threads.Client) {
 
 func handlePostError(err error) {
 	switch {
-	case threads.IsValidationError(err):
-		var validationErr *threads.ValidationError
+	case api.IsValidationError(err):
+		var validationErr *api.ValidationError
 		errors.As(err, &validationErr)
 		fmt.Printf("    Validation error in field '%s': %s\n", validationErr.Field, validationErr.Message)
 
-	case threads.IsAuthenticationError(err):
+	case api.IsAuthenticationError(err):
 		fmt.Println("    Authentication error - check your token")
 
-	case threads.IsRateLimitError(err):
-		var rateLimitErr *threads.RateLimitError
+	case api.IsRateLimitError(err):
+		var rateLimitErr *api.RateLimitError
 		errors.As(err, &rateLimitErr)
 		fmt.Printf("    Rate limit error - retry after %v\n", rateLimitErr.RetryAfter)
 
-	case threads.IsNetworkError(err):
-		var networkErr *threads.NetworkError
+	case api.IsNetworkError(err):
+		var networkErr *api.NetworkError
 		errors.As(err, &networkErr)
 		if networkErr.Temporary {
 			fmt.Println("    Temporary network error - retry might succeed")
@@ -356,8 +356,8 @@ func handlePostError(err error) {
 			fmt.Println("    Permanent network error - check connectivity")
 		}
 
-	case threads.IsAPIError(err):
-		var apiErr *threads.APIError
+	case api.IsAPIError(err):
+		var apiErr *api.APIError
 		errors.As(err, &apiErr)
 		fmt.Printf("    API error (Request ID: %s): %s\n", apiErr.RequestID, apiErr.Message)
 
@@ -366,7 +366,7 @@ func handlePostError(err error) {
 	}
 }
 
-func printPostInfo(post *threads.Post) {
+func printPostInfo(post *api.Post) {
 	fmt.Printf("   Post ID: %s\n", post.ID)
 	if post.Text != "" {
 		// Truncate long text for display

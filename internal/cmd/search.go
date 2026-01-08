@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	threads "github.com/salmonumbrella/threads-go"
-	"github.com/salmonumbrella/threads-go/internal/iocontext"
-	"github.com/salmonumbrella/threads-go/internal/outfmt"
+	"github.com/salmonumbrella/threads-cli/internal/api"
+	"github.com/salmonumbrella/threads-cli/internal/iocontext"
+	"github.com/salmonumbrella/threads-cli/internal/outfmt"
 )
 
 // NewSearchCmd builds the search command.
@@ -52,7 +52,7 @@ Results can be sorted by popularity (top) or recency (recent).`,
 				return err
 			}
 
-			opts := &threads.SearchOptions{
+			opts := &api.SearchOptions{
 				Limit: limit,
 				After: cursor,
 			}
@@ -60,9 +60,9 @@ Results can be sorted by popularity (top) or recency (recent).`,
 			// Handle search mode
 			switch strings.ToLower(mode) {
 			case "keyword", "":
-				opts.SearchMode = threads.SearchModeKeyword
+				opts.SearchMode = api.SearchModeKeyword
 			case "tag":
-				opts.SearchMode = threads.SearchModeTag
+				opts.SearchMode = api.SearchModeTag
 			default:
 				return &UserFriendlyError{
 					Message:    fmt.Sprintf("Invalid --mode value: %s", mode),
@@ -73,9 +73,9 @@ Results can be sorted by popularity (top) or recency (recent).`,
 			// Handle search type
 			switch strings.ToLower(searchType) {
 			case "top", "":
-				opts.SearchType = threads.SearchTypeTop
+				opts.SearchType = api.SearchTypeTop
 			case "recent":
-				opts.SearchType = threads.SearchTypeRecent
+				opts.SearchType = api.SearchTypeRecent
 			default:
 				return &UserFriendlyError{
 					Message:    fmt.Sprintf("Invalid --type value: %s", searchType),
