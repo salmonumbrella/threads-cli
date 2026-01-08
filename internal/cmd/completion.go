@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
+
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 )
 
-func newCompletionCmd() *cobra.Command {
+func NewCompletionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate shell completion scripts",
@@ -45,15 +45,16 @@ PowerShell:
 		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			io := iocontext.GetIO(cmd.Context())
 			switch args[0] {
 			case "bash":
-				return cmd.Root().GenBashCompletion(os.Stdout)
+				return cmd.Root().GenBashCompletion(io.Out)
 			case "zsh":
-				return cmd.Root().GenZshCompletion(os.Stdout)
+				return cmd.Root().GenZshCompletion(io.Out)
 			case "fish":
-				return cmd.Root().GenFishCompletion(os.Stdout, true)
+				return cmd.Root().GenFishCompletion(io.Out, true)
 			case "powershell":
-				return cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+				return cmd.Root().GenPowerShellCompletionWithDesc(io.Out)
 			}
 			return nil
 		},

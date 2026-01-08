@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -72,7 +71,7 @@ func NewListCommand[T any](cfg ListConfig[T], getClient func(context.Context) (*
 
 			// Handle JSON output mode
 			if outfmt.IsJSON(ctx) {
-				return outputListJSON(io, result, cursor)
+				return outputListJSON(io, result, cursor, outfmt.GetQuery(ctx))
 			}
 
 			// Handle empty results in text mode
@@ -119,7 +118,7 @@ type listJSONOutput struct {
 // outputListJSON outputs the list result as JSON
 //
 //nolint:unparam // requestCursor reserved for future pagination features
-func outputListJSON[T any](io *iocontext.IO, result ListResult[T], _ string) error {
+func outputListJSON[T any](io *iocontext.IO, result ListResult[T], _ string, query string) error {
 	output := listJSONOutput{
 		Items:   result.Items,
 		HasMore: result.HasMore,
@@ -131,7 +130,5 @@ func outputListJSON[T any](io *iocontext.IO, result ListResult[T], _ string) err
 		output.Items = []T{}
 	}
 
-	enc := json.NewEncoder(io.Out)
-	enc.SetIndent("", "  ")
-	return enc.Encode(output)
+	return outfmt.WriteJSONTo(io.Out, output, query)
 }

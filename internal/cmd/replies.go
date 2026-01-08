@@ -1,279 +1,262 @@
 package cmd
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/ui"
 )
 
-var repliesCmd = &cobra.Command{
-	Use:   "replies",
-	Short: "Manage replies to posts",
-	Long:  `List, create, hide, and manage replies to Threads posts.`,
+// NewRepliesCmd builds the replies command group.
+func NewRepliesCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "replies",
+		Short: "Manage replies to posts",
+		Long:  `List, create, hide, and manage replies to Threads posts.`,
+	}
+
+	cmd.AddCommand(newRepliesListCmd(f))
+	cmd.AddCommand(newRepliesCreateCmd(f))
+	cmd.AddCommand(newRepliesHideCmd(f))
+	cmd.AddCommand(newRepliesUnhideCmd(f))
+	cmd.AddCommand(newRepliesConversationCmd(f))
+
+	return cmd
 }
 
-var repliesListCmd = &cobra.Command{
-	Use:   "list [post-id]",
-	Short: "List replies to a post",
-	Long: `List all replies to a specific post.
+func newRepliesListCmd(f *Factory) *cobra.Command {
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "list [post-id]",
+		Short: "List replies to a post",
+		Long: `List all replies to a specific post.
 
 Results are paginated and can be filtered with --limit.`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRepliesList,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			postID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			opts := &threads.RepliesOptions{}
+			if limit > 0 {
+				opts.Limit = limit
+			}
+
+			replies, err := client.GetReplies(ctx, threads.PostID(postID), opts)
+			if err != nil {
+				return WrapError("failed to get replies", err)
+			}
+
+			io := iocontext.GetIO(ctx)
+			if outfmt.IsJSON(ctx) {
+				return outfmt.WriteJSONTo(io.Out, replies, outfmt.GetQuery(ctx))
+			}
+
+			if len(replies.Data) == 0 {
+				f.UI(ctx).Info("No replies found for post %s", postID)
+				return nil
+			}
+
+			headers := []string{"ID", "FROM", "TEXT", "DATE"}
+			rows := make([][]string, len(replies.Data))
+			for i, reply := range replies.Data {
+				text := strings.ReplaceAll(reply.Text, "\n", " ")
+				if len(text) > 50 {
+					text = text[:47] + "..."
+				}
+				rows[i] = []string{
+					reply.ID,
+					"@" + reply.Username,
+					text,
+					reply.Timestamp.Format("2006-01-02 15:04"),
+				}
+			}
+
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+			return out.Table(headers, rows, []outfmt.ColumnType{
+				outfmt.ColumnID,
+				outfmt.ColumnPlain,
+				outfmt.ColumnPlain,
+				outfmt.ColumnDate,
+			})
+		},
+	}
+
+	cmd.Flags().IntVar(&limit, "limit", 25, "Maximum number of replies to return")
+	return cmd
 }
 
-var repliesCreateCmd = &cobra.Command{
-	Use:   "create [post-id]",
-	Short: "Reply to a post",
-	Long: `Create a reply to a specific post.
+func newRepliesCreateCmd(f *Factory) *cobra.Command {
+	var text string
+
+	cmd := &cobra.Command{
+		Use:   "create [post-id]",
+		Short: "Reply to a post",
+		Long: `Create a reply to a specific post.
 
 Provide the text of your reply with the --text flag.`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRepliesCreate,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			postID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			content := &threads.PostContent{
+				Text: text,
+			}
+			reply, err := client.ReplyToPost(ctx, threads.PostID(postID), content)
+			if err != nil {
+				return WrapError("failed to create reply", err)
+			}
+
+			io := iocontext.GetIO(ctx)
+			if outfmt.IsJSON(ctx) {
+				return outfmt.WriteJSONTo(io.Out, reply, outfmt.GetQuery(ctx))
+			}
+
+			f.UI(ctx).Success("Reply created successfully!")
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&text, "text", "t", "", "Text content for the reply (required)")
+	//nolint:errcheck,gosec // MarkFlagRequired cannot fail for a flag that exists
+	cmd.MarkFlagRequired("text")
+	return cmd
 }
 
-var repliesHideCmd = &cobra.Command{
-	Use:   "hide [reply-id]",
-	Short: "Hide a reply",
-	Long: `Hide a reply from public view.
+func newRepliesHideCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "hide [reply-id]",
+		Short: "Hide a reply",
+		Long: `Hide a reply from public view.
 
 Hidden replies are not visible to other users but can be unhidden later.
 You can only hide replies on posts that you own.`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRepliesHide,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			replyID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			if err := client.HideReply(ctx, threads.PostID(replyID)); err != nil {
+				return WrapError("failed to hide reply", err)
+			}
+
+			f.UI(ctx).Success("Reply %s hidden", replyID)
+			return nil
+		},
+	}
+	return cmd
 }
 
-var repliesUnhideCmd = &cobra.Command{
-	Use:   "unhide [reply-id]",
-	Short: "Unhide a reply",
-	Long:  `Unhide a previously hidden reply, making it visible again.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRepliesUnhide,
+func newRepliesUnhideCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unhide [reply-id]",
+		Short: "Unhide a reply",
+		Long:  `Unhide a previously hidden reply, making it visible again.`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			replyID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			if err := client.UnhideReply(ctx, threads.PostID(replyID)); err != nil {
+				return WrapError("failed to unhide reply", err)
+			}
+
+			f.UI(ctx).Success("Reply %s unhidden", replyID)
+			return nil
+		},
+	}
+	return cmd
 }
 
-var repliesConversationCmd = &cobra.Command{
-	Use:   "conversation [post-id]",
-	Short: "Get full conversation thread",
-	Long: `Get the full conversation thread for a post.
+func newRepliesConversationCmd(f *Factory) *cobra.Command {
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "conversation [post-id]",
+		Short: "Get full conversation thread",
+		Long: `Get the full conversation thread for a post.
 
 Returns all replies in the conversation in a flattened format.`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRepliesConversation,
-}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			postID := args[0]
+			ctx := cmd.Context()
 
-// Replies command flags
-var (
-	replyText string
-)
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
 
-func init() {
-	// List flags
-	repliesListCmd.Flags().IntVar(&limitFlag, "limit", 25, "Maximum number of replies to return")
+			opts := &threads.RepliesOptions{}
+			if limit > 0 {
+				opts.Limit = limit
+			}
 
-	// Create flags
-	repliesCreateCmd.Flags().StringVarP(&replyText, "text", "t", "", "Text content for the reply (required)")
-	//nolint:errcheck,gosec // MarkFlagRequired cannot fail for a flag that exists
-	repliesCreateCmd.MarkFlagRequired("text")
+			result, err := client.GetConversation(ctx, threads.PostID(postID), opts)
+			if err != nil {
+				return WrapError("failed to get conversation", err)
+			}
 
-	// Conversation flags
-	repliesConversationCmd.Flags().IntVar(&limitFlag, "limit", 25, "Maximum number of posts to return")
+			io := iocontext.GetIO(ctx)
+			if outfmt.IsJSON(ctx) {
+				return outfmt.WriteJSONTo(io.Out, result, outfmt.GetQuery(ctx))
+			}
 
-	repliesCmd.AddCommand(repliesListCmd)
-	repliesCmd.AddCommand(repliesCreateCmd)
-	repliesCmd.AddCommand(repliesHideCmd)
-	repliesCmd.AddCommand(repliesUnhideCmd)
-	repliesCmd.AddCommand(repliesConversationCmd)
-}
+			if len(result.Data) == 0 {
+				f.UI(ctx).Info("No conversation found for post %s", postID)
+				return nil
+			}
 
-func runRepliesList(cmd *cobra.Command, args []string) error {
-	postID := args[0]
+			headers := []string{"ID", "FROM", "TEXT", "DATE"}
+			rows := make([][]string, len(result.Data))
+			for i, reply := range result.Data {
+				text := strings.ReplaceAll(reply.Text, "\n", " ")
+				if len(text) > 50 {
+					text = text[:47] + "..."
+				}
+				rows[i] = []string{
+					reply.ID,
+					"@" + reply.Username,
+					text,
+					reply.Timestamp.Format("2006-01-02 15:04"),
+				}
+			}
 
-	client, err := getClient(cmd.Context())
-	if err != nil {
-		return err
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+			return out.Table(headers, rows, []outfmt.ColumnType{
+				outfmt.ColumnID,
+				outfmt.ColumnPlain,
+				outfmt.ColumnPlain,
+				outfmt.ColumnDate,
+			})
+		},
 	}
 
-	opts := &threads.RepliesOptions{}
-	if limitFlag > 0 {
-		opts.Limit = limitFlag
-	}
-
-	replies, err := client.GetReplies(cmd.Context(), threads.PostID(postID), opts)
-	if err != nil {
-		return WrapError("failed to get replies", err)
-	}
-
-	ctx := cmd.Context()
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(replies, jqQuery)
-	}
-
-	if len(replies.Data) == 0 {
-		ui.Info("No replies found for post %s", postID)
-		return nil
-	}
-
-	f := outfmt.NewFormatter()
-	f.Header("ID", "USERNAME", "TEXT", "TIMESTAMP")
-
-	for _, reply := range replies.Data {
-		text := reply.Text
-		if len(text) > 50 {
-			text = text[:47] + "..."
-		}
-		f.Row(reply.ID, "@"+reply.Username, text, reply.Timestamp.Format("2006-01-02 15:04"))
-	}
-	f.Flush()
-
-	if replies.Paging.Cursors != nil && replies.Paging.Cursors.After != "" {
-		fmt.Printf("\nShowing %d replies. Use --limit to see more.\n", len(replies.Data))
-	}
-
-	return nil
-}
-
-func runRepliesCreate(cmd *cobra.Command, args []string) error {
-	postID := args[0]
-
-	if replyText == "" {
-		return &UserFriendlyError{
-			Message:    "Reply text is required",
-			Suggestion: "Use the --text flag to provide your reply content",
-		}
-	}
-
-	client, err := getClient(cmd.Context())
-	if err != nil {
-		return err
-	}
-
-	content := &threads.PostContent{
-		Text: replyText,
-	}
-
-	reply, err := client.ReplyToPost(cmd.Context(), threads.PostID(postID), content)
-	if err != nil {
-		return WrapError("failed to create reply", err)
-	}
-
-	ctx := cmd.Context()
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(reply, jqQuery)
-	}
-
-	ui.Success("Reply created successfully!")
-	fmt.Printf("  ID:        %s\n", reply.ID)
-	fmt.Printf("  Permalink: %s\n", reply.Permalink)
-
-	return nil
-}
-
-func runRepliesHide(cmd *cobra.Command, args []string) error {
-	replyID := args[0]
-
-	client, err := getClient(cmd.Context())
-	if err != nil {
-		return err
-	}
-
-	if err := client.HideReply(cmd.Context(), threads.PostID(replyID)); err != nil {
-		return WrapError("failed to hide reply", err)
-	}
-
-	ctx := cmd.Context()
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(map[string]any{
-			"success":  true,
-			"reply_id": replyID,
-			"action":   "hidden",
-		}, jqQuery)
-	}
-
-	ui.Success("Reply %s hidden", replyID)
-	return nil
-}
-
-func runRepliesUnhide(cmd *cobra.Command, args []string) error {
-	replyID := args[0]
-
-	client, err := getClient(cmd.Context())
-	if err != nil {
-		return err
-	}
-
-	if err := client.UnhideReply(cmd.Context(), threads.PostID(replyID)); err != nil {
-		return WrapError("failed to unhide reply", err)
-	}
-
-	ctx := cmd.Context()
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(map[string]any{
-			"success":  true,
-			"reply_id": replyID,
-			"action":   "unhidden",
-		}, jqQuery)
-	}
-
-	ui.Success("Reply %s unhidden", replyID)
-	return nil
-}
-
-func runRepliesConversation(cmd *cobra.Command, args []string) error {
-	postID := args[0]
-
-	client, err := getClient(cmd.Context())
-	if err != nil {
-		return err
-	}
-
-	opts := &threads.RepliesOptions{}
-	if limitFlag > 0 {
-		opts.Limit = limitFlag
-	}
-
-	conversation, err := client.GetConversation(cmd.Context(), threads.PostID(postID), opts)
-	if err != nil {
-		return WrapError("failed to get conversation", err)
-	}
-
-	ctx := cmd.Context()
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(conversation, jqQuery)
-	}
-
-	if len(conversation.Data) == 0 {
-		ui.Info("No conversation found for post %s", postID)
-		return nil
-	}
-
-	f := outfmt.NewFormatter()
-	f.Header("ID", "USERNAME", "TEXT", "TIMESTAMP", "IS_REPLY")
-
-	for _, post := range conversation.Data {
-		text := post.Text
-		if len(text) > 50 {
-			text = text[:47] + "..."
-		}
-		isReply := "no"
-		if post.IsReply {
-			isReply = "yes"
-		}
-		f.Row(post.ID, "@"+post.Username, text, post.Timestamp.Format("2006-01-02 15:04"), isReply)
-	}
-	f.Flush()
-
-	if conversation.Paging.Cursors != nil && conversation.Paging.Cursors.After != "" {
-		fmt.Printf("\nShowing %d posts. Use --limit to see more.\n", len(conversation.Data))
-	}
-
-	return nil
+	cmd.Flags().IntVar(&limit, "limit", 25, "Maximum number of posts to return")
+	return cmd
 }

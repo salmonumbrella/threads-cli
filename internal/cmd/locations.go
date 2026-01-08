@@ -4,23 +4,25 @@ import (
 	"github.com/spf13/cobra"
 
 	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
 )
 
-func newLocationsCmd() *cobra.Command {
+// NewLocationsCmd builds the locations command group.
+func NewLocationsCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "locations",
 		Aliases: []string{"location", "loc"},
 		Short:   "Location search and details",
 	}
 
-	cmd.AddCommand(newLocationsSearchCmd())
-	cmd.AddCommand(newLocationsGetCmd())
+	cmd.AddCommand(newLocationsSearchCmd(f))
+	cmd.AddCommand(newLocationsGetCmd(f))
 
 	return cmd
 }
 
-func newLocationsSearchCmd() *cobra.Command {
+func newLocationsSearchCmd(f *Factory) *cobra.Command {
 	var lat, lng float64
 
 	cmd := &cobra.Command{
@@ -40,7 +42,8 @@ func newLocationsSearchCmd() *cobra.Command {
 				}
 			}
 
-			client, err := getClient(cmd.Context())
+			ctx := cmd.Context()
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
@@ -51,19 +54,20 @@ func newLocationsSearchCmd() *cobra.Command {
 				lngPtr = &lng
 			}
 
-			result, err := client.SearchLocations(cmd.Context(), query, latPtr, lngPtr)
+			result, err := client.SearchLocations(ctx, query, latPtr, lngPtr)
 			if err != nil {
 				return WrapError("location search failed", err)
 			}
 
-			f := outfmt.FromContext(cmd.Context())
+			io := iocontext.GetIO(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
 
-			if outfmt.IsJSON(cmd.Context()) {
-				return f.Output(result)
+			if outfmt.IsJSON(ctx) {
+				return out.Output(result)
 			}
 
 			if len(result.Data) == 0 {
-				f.Empty("No locations found")
+				out.Empty("No locations found")
 				return nil
 			}
 
@@ -77,7 +81,7 @@ func newLocationsSearchCmd() *cobra.Command {
 				}
 			}
 
-			return f.Table(headers, rows, nil)
+			return out.Table(headers, rows, nil)
 		},
 	}
 
@@ -87,7 +91,7 @@ func newLocationsSearchCmd() *cobra.Command {
 	return cmd
 }
 
-func newLocationsGetCmd() *cobra.Command {
+func newLocationsGetCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get [location-id]",
 		Short: "Get location details",
@@ -95,18 +99,20 @@ func newLocationsGetCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			locationID := args[0]
 
-			client, err := getClient(cmd.Context())
+			ctx := cmd.Context()
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
 
-			location, err := client.GetLocation(cmd.Context(), threads.LocationID(locationID))
+			location, err := client.GetLocation(ctx, threads.LocationID(locationID))
 			if err != nil {
 				return WrapError("failed to get location", err)
 			}
 
-			f := outfmt.FromContext(cmd.Context())
-			return f.Output(location)
+			io := iocontext.GetIO(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+			return out.Output(location)
 		},
 	}
 	return cmd

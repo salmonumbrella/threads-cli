@@ -9,78 +9,53 @@ import (
 	"github.com/spf13/cobra"
 
 	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
 	"github.com/salmonumbrella/threads-go/internal/ui"
 )
 
-var postsCmd = &cobra.Command{
-	Use:   "posts",
-	Short: "Manage posts",
-	Long:  `Create, read, list, and delete posts on Threads.`,
+// NewPostsCmd builds the posts command group.
+func NewPostsCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "posts",
+		Short: "Manage posts",
+		Long:  `Create, read, list, and delete posts on Threads.`,
+	}
+
+	cmd.AddCommand(newPostsCreateCmd(f))
+	cmd.AddCommand(newPostsGetCmd(f))
+	cmd.AddCommand(newPostsListCmd(f))
+	cmd.AddCommand(newPostsDeleteCmd(f))
+	cmd.AddCommand(newPostsCarouselCmd(f))
+	cmd.AddCommand(newPostsQuoteCmd(f))
+	cmd.AddCommand(newPostsRepostCmd(f))
+	cmd.AddCommand(newPostsUnrepostCmd(f))
+	cmd.AddCommand(newPostsGhostListCmd(f))
+
+	return cmd
 }
 
-// Posts command flags
-var (
-	postsText         string
-	postsImageURL     string
-	postsVideoURL     string
-	postsAltText      string
-	postsReplyTo      string
-	postsPoll         string
-	postsGhost        bool
-	postsTopic        string
-	postsLocation     string
-	postsReplyControl string
-	postsGIF          string
-)
-
-// Carousel command flags
-var (
-	carouselItems       []string
-	carouselText        string
-	carouselAltTexts    []string
-	carouselReplyTo     string
-	carouselWaitTimeout int
-)
-
-func init() {
-	// Create command flags
-	postsCreateCmd.Flags().StringVarP(&postsText, "text", "t", "", "Post text content")
-	postsCreateCmd.Flags().StringVar(&postsImageURL, "image", "", "Image URL for image posts")
-	postsCreateCmd.Flags().StringVar(&postsVideoURL, "video", "", "Video URL for video posts")
-	postsCreateCmd.Flags().StringVar(&postsAltText, "alt-text", "", "Alt text for media accessibility")
-	postsCreateCmd.Flags().StringVar(&postsReplyTo, "reply-to", "", "Post ID to reply to")
-	postsCreateCmd.Flags().StringVar(&postsPoll, "poll", "", "Create a poll with comma-separated options (2-4 options, e.g., \"Yes,No\" or \"A,B,C,D\")")
-	postsCreateCmd.Flags().BoolVar(&postsGhost, "ghost", false, "Create a ghost post (text-only, expires in 24 hours, no replies allowed)")
-	postsCreateCmd.Flags().StringVar(&postsTopic, "topic", "", "Add a topic tag to the post")
-	postsCreateCmd.Flags().StringVar(&postsLocation, "location", "", "Attach a location ID to the post (use 'threads locations search' to find IDs)")
-	postsCreateCmd.Flags().StringVar(&postsReplyControl, "reply-control", "", "Control who can reply: everyone, accounts_you_follow, mentioned_only")
-	postsCreateCmd.Flags().StringVar(&postsGIF, "gif", "", "Attach a GIF using a Tenor GIF ID (text-only posts)")
-
-	// Carousel command flags
-	postsCarouselCmd.Flags().StringSliceVar(&carouselItems, "items", nil, "Media URLs (comma-separated)")
-	postsCarouselCmd.Flags().StringVar(&carouselText, "text", "", "Caption text")
-	postsCarouselCmd.Flags().StringSliceVar(&carouselAltTexts, "alt-text", nil, "Alt text for each item (in order)")
-	postsCarouselCmd.Flags().StringVar(&carouselReplyTo, "reply-to", "", "Post ID to reply to")
-	postsCarouselCmd.Flags().IntVar(&carouselWaitTimeout, "timeout", 300, "Timeout in seconds for container processing")
-	//nolint:errcheck,gosec // MarkFlagRequired cannot fail for a flag that exists
-	postsCarouselCmd.MarkFlagRequired("items")
-
-	postsCmd.AddCommand(postsCreateCmd)
-	postsCmd.AddCommand(postsGetCmd)
-	postsCmd.AddCommand(postsListCmd)
-	postsCmd.AddCommand(postsDeleteCmd)
-	postsCmd.AddCommand(postsCarouselCmd)
-	postsCmd.AddCommand(newPostsQuoteCmd())
-	postsCmd.AddCommand(newPostsRepostCmd())
-	postsCmd.AddCommand(newPostsUnrepostCmd())
-	postsCmd.AddCommand(newPostsGhostListCmd())
+type postsCreateOptions struct {
+	Text         string
+	ImageURL     string
+	VideoURL     string
+	AltText      string
+	ReplyTo      string
+	Poll         string
+	Ghost        bool
+	Topic        string
+	Location     string
+	ReplyControl string
+	GIF          string
 }
 
-var postsCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new post",
-	Long: `Create a new post on Threads.
+func newPostsCreateCmd(f *Factory) *cobra.Command {
+	opts := &postsCreateOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a new post",
+		Long: `Create a new post on Threads.
 
 Supports text, image, and video posts. For carousel posts, use 'threads posts carousel'.
 
@@ -111,60 +86,34 @@ Examples:
 
   # Create a post with a GIF
   threads posts create --text "This is hilarious" --gif TENOR_GIF_ID`,
-	RunE: runPostsCreate,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsCreate(cmd, f, opts)
+		},
+	}
+
+	cmd.Flags().StringVarP(&opts.Text, "text", "t", "", "Post text content")
+	cmd.Flags().StringVar(&opts.ImageURL, "image", "", "Image URL for image posts")
+	cmd.Flags().StringVar(&opts.VideoURL, "video", "", "Video URL for video posts")
+	cmd.Flags().StringVar(&opts.AltText, "alt-text", "", "Alt text for media accessibility")
+	cmd.Flags().StringVar(&opts.ReplyTo, "reply-to", "", "Post ID to reply to")
+	cmd.Flags().StringVar(&opts.Poll, "poll", "", "Create a poll with comma-separated options (2-4 options, e.g., \"Yes,No\" or \"A,B,C,D\")")
+	cmd.Flags().BoolVar(&opts.Ghost, "ghost", false, "Create a ghost post (text-only, expires in 24 hours, no replies allowed)")
+	cmd.Flags().StringVar(&opts.Topic, "topic", "", "Add a topic tag to the post")
+	cmd.Flags().StringVar(&opts.Location, "location", "", "Attach a location ID to the post (use 'threads locations search' to find IDs)")
+	cmd.Flags().StringVar(&opts.ReplyControl, "reply-control", "", "Control who can reply: everyone, accounts_you_follow, mentioned_only")
+	cmd.Flags().StringVar(&opts.GIF, "gif", "", "Attach a GIF using a Tenor GIF ID (text-only posts)")
+
+	return cmd
 }
 
-var postsGetCmd = &cobra.Command{
-	Use:   "get [post-id]",
-	Short: "Get a single post by ID",
-	Long: `Retrieve a single post by its ID.
-
-Example:
-  threads posts get 12345678901234567`,
-	Args: cobra.ExactArgs(1),
-	RunE: runPostsGet,
-}
-
-var postsListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List user's posts",
-	Long: `List posts from the authenticated user.
-
-Examples:
-  # List recent posts
-  threads posts list
-
-  # List with pagination
-  threads posts list --limit 10
-
-  # Output as JSON
-  threads posts list --output json`,
-	RunE: runPostsList,
-}
-
-var postsDeleteCmd = &cobra.Command{
-	Use:   "delete [post-id]",
-	Short: "Delete a post",
-	Long: `Delete a post by its ID.
-
-Requires confirmation unless --yes flag is provided.
-
-Example:
-  threads posts delete 12345678901234567
-  threads posts delete 12345678901234567 --yes`,
-	Args: cobra.ExactArgs(1),
-	RunE: runPostsDelete,
-}
-
-func runPostsCreate(cmd *cobra.Command, args []string) error {
+func runPostsCreate(cmd *cobra.Command, f *Factory, opts *postsCreateOptions) error {
 	ctx := cmd.Context()
 
-	// Determine post type based on flags
-	hasImage := postsImageURL != ""
-	hasVideo := postsVideoURL != ""
-	hasText := postsText != ""
-	hasPoll := postsPoll != ""
-	hasGIF := postsGIF != ""
+	hasImage := opts.ImageURL != ""
+	hasVideo := opts.VideoURL != ""
+	hasText := opts.Text != ""
+	hasPoll := opts.Poll != ""
+	hasGIF := opts.GIF != ""
 
 	if !hasText && !hasImage && !hasVideo {
 		return &UserFriendlyError{
@@ -180,15 +129,13 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Ghost posts are text-only
-	if postsGhost && (hasImage || hasVideo) {
+	if opts.Ghost && (hasImage || hasVideo) {
 		return &UserFriendlyError{
 			Message:    "Ghost posts can only contain text",
 			Suggestion: "Remove --image or --video flags to create a ghost post",
 		}
 	}
 
-	// Polls are text-only
 	if hasPoll && (hasImage || hasVideo) {
 		return &UserFriendlyError{
 			Message:    "Poll posts can only contain text",
@@ -196,7 +143,6 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// GIF posts are text-only
 	if hasGIF && (hasImage || hasVideo) {
 		return &UserFriendlyError{
 			Message:    "GIF posts can only contain text",
@@ -204,10 +150,9 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Parse and validate reply-control
 	var replyControl threads.ReplyControl
-	if postsReplyControl != "" {
-		switch postsReplyControl {
+	if opts.ReplyControl != "" {
+		switch opts.ReplyControl {
 		case "everyone":
 			replyControl = threads.ReplyControlEveryone
 		case "accounts_you_follow":
@@ -216,16 +161,15 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 			replyControl = threads.ReplyControlMentioned
 		default:
 			return &UserFriendlyError{
-				Message:    fmt.Sprintf("Invalid reply-control value: %s", postsReplyControl),
+				Message:    fmt.Sprintf("Invalid reply-control value: %s", opts.ReplyControl),
 				Suggestion: "Valid values are: everyone, accounts_you_follow, mentioned_only",
 			}
 		}
 	}
 
-	// Parse poll options
 	var pollAttachment *threads.PollAttachment
 	if hasPoll {
-		options := strings.Split(postsPoll, ",")
+		options := strings.Split(opts.Poll, ",")
 		for i := range options {
 			options[i] = strings.TrimSpace(options[i])
 		}
@@ -253,7 +197,7 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -263,39 +207,39 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 	switch {
 	case hasImage:
 		content := &threads.ImagePostContent{
-			Text:         postsText,
-			ImageURL:     postsImageURL,
-			AltText:      postsAltText,
-			ReplyTo:      postsReplyTo,
+			Text:         opts.Text,
+			ImageURL:     opts.ImageURL,
+			AltText:      opts.AltText,
+			ReplyTo:      opts.ReplyTo,
 			ReplyControl: replyControl,
-			TopicTag:     postsTopic,
-			LocationID:   postsLocation,
+			TopicTag:     opts.Topic,
+			LocationID:   opts.Location,
 		}
 		post, err = client.CreateImagePost(ctx, content)
 	case hasVideo:
 		content := &threads.VideoPostContent{
-			Text:         postsText,
-			VideoURL:     postsVideoURL,
-			AltText:      postsAltText,
-			ReplyTo:      postsReplyTo,
+			Text:         opts.Text,
+			VideoURL:     opts.VideoURL,
+			AltText:      opts.AltText,
+			ReplyTo:      opts.ReplyTo,
 			ReplyControl: replyControl,
-			TopicTag:     postsTopic,
-			LocationID:   postsLocation,
+			TopicTag:     opts.Topic,
+			LocationID:   opts.Location,
 		}
 		post, err = client.CreateVideoPost(ctx, content)
 	default:
 		content := &threads.TextPostContent{
-			Text:           postsText,
-			ReplyTo:        postsReplyTo,
+			Text:           opts.Text,
+			ReplyTo:        opts.ReplyTo,
 			ReplyControl:   replyControl,
-			TopicTag:       postsTopic,
-			LocationID:     postsLocation,
+			TopicTag:       opts.Topic,
+			LocationID:     opts.Location,
 			PollAttachment: pollAttachment,
-			IsGhostPost:    postsGhost,
+			IsGhostPost:    opts.Ghost,
 		}
 		if hasGIF {
 			content.GIFAttachment = &threads.GIFAttachment{
-				GIFID:    postsGIF,
+				GIFID:    opts.GIF,
 				Provider: threads.GIFProviderTenor,
 			}
 		}
@@ -306,33 +250,49 @@ func runPostsCreate(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to create post", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(post, jqQuery)
+		return outfmt.WriteJSONTo(io.Out, post, outfmt.GetQuery(ctx))
 	}
 
-	if postsGhost {
-		ui.Success("Ghost post created successfully! (expires in 24 hours)")
+	p := f.UI(ctx)
+	if opts.Ghost {
+		p.Success("Ghost post created successfully! (expires in 24 hours)")
 	} else {
-		ui.Success("Post created successfully!")
+		p.Success("Post created successfully!")
 	}
-	fmt.Printf("  ID:        %s\n", post.ID)
-	fmt.Printf("  Permalink: %s\n", post.Permalink)
+	fmt.Fprintf(io.Out, "  ID:        %s\n", post.ID)        //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Permalink: %s\n", post.Permalink) //nolint:errcheck // Best-effort output
 	if post.Text != "" {
 		text := post.Text
 		if len(text) > 50 {
 			text = text[:50] + "..."
 		}
-		fmt.Printf("  Text:      %s\n", text)
+		fmt.Fprintf(io.Out, "  Text:      %s\n", text) //nolint:errcheck // Best-effort output
 	}
 
 	return nil
 }
 
-func runPostsGet(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	postID := args[0]
+func newPostsGetCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get [post-id]",
+		Short: "Get a single post by ID",
+		Long: `Retrieve a single post by its ID.
 
-	client, err := getClient(ctx)
+Example:
+  threads posts get 12345678901234567`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsGet(cmd, f, args[0])
+		},
+	}
+	return cmd
+}
+
+func runPostsGet(cmd *cobra.Command, f *Factory, postID string) error {
+	ctx := cmd.Context()
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -342,127 +302,168 @@ func runPostsGet(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to get post", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(post, jqQuery)
+		return outfmt.WriteJSONTo(io.Out, post, outfmt.GetQuery(ctx))
 	}
 
-	fmt.Printf("ID:        %s\n", post.ID)
-	fmt.Printf("Username:  @%s\n", post.Username)
-	fmt.Printf("Type:      %s\n", post.MediaType)
-	fmt.Printf("Permalink: %s\n", post.Permalink)
-	fmt.Printf("Timestamp: %s\n", post.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(io.Out, "ID:        %s\n", post.ID)                                      //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "Username:  @%s\n", post.Username)                               //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "Type:      %s\n", post.MediaType)                               //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "Permalink: %s\n", post.Permalink)                               //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "Timestamp: %s\n", post.Timestamp.Format("2006-01-02 15:04:05")) //nolint:errcheck // Best-effort output
 
 	if post.Text != "" {
-		fmt.Printf("Text:      %s\n", post.Text)
+		fmt.Fprintf(io.Out, "Text:      %s\n", post.Text) //nolint:errcheck // Best-effort output
 	}
 	if post.MediaURL != "" {
-		fmt.Printf("Media URL: %s\n", post.MediaURL)
+		fmt.Fprintf(io.Out, "Media URL: %s\n", post.MediaURL) //nolint:errcheck // Best-effort output
 	}
 	if post.IsReply {
-		fmt.Printf("Reply to:  %s\n", post.ReplyTo)
+		fmt.Fprintf(io.Out, "Reply to:  %s\n", post.ReplyTo) //nolint:errcheck // Best-effort output
 	}
 	if post.IsQuotePost {
-		fmt.Println("Quote:     yes")
+		fmt.Fprintln(io.Out, "Quote:     yes") //nolint:errcheck // Best-effort output
 	}
 
 	return nil
 }
 
-func runPostsList(cmd *cobra.Command, args []string) error {
+func newPostsListCmd(f *Factory) *cobra.Command {
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List user's posts",
+		Long: `List posts from the authenticated user.
+
+Examples:
+  # List recent posts
+  threads posts list
+
+  # List with pagination
+  threads posts list --limit 10
+
+  # Output as JSON
+  threads posts list --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsList(cmd, f, limit)
+		},
+	}
+
+	cmd.Flags().IntVar(&limit, "limit", 25, "Maximum number of results")
+	return cmd
+}
+
+func runPostsList(cmd *cobra.Command, f *Factory, limit int) error {
 	ctx := cmd.Context()
 
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Get user info to get user ID
 	me, err := client.GetMe(ctx)
 	if err != nil {
 		return WrapError("failed to get user info", err)
 	}
 
-	opts := &threads.PostsOptions{}
-	if limitFlag > 0 {
-		opts.Limit = limitFlag
+	opts := &threads.PaginationOptions{}
+	if limit > 0 {
+		opts.Limit = limit
 	}
 
-	postsResp, err := client.GetUserPosts(ctx, threads.UserID(me.ID), nil)
+	postsResp, err := client.GetUserPosts(ctx, threads.UserID(me.ID), opts)
 	if err != nil {
 		return WrapError("failed to list posts", err)
 	}
 
-	// Apply limit if specified
 	posts := postsResp.Data
-	if limitFlag > 0 && len(posts) > limitFlag {
-		posts = posts[:limitFlag]
+	if limit > 0 && len(posts) > limit {
+		posts = posts[:limit]
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(map[string]any{
+		return outfmt.WriteJSONTo(io.Out, map[string]any{
 			"posts":  posts,
 			"paging": postsResp.Paging,
-		}, jqQuery)
+		}, outfmt.GetQuery(ctx))
 	}
 
 	if len(posts) == 0 {
-		ui.Info("No posts found")
+		f.UI(ctx).Info("No posts found")
 		return nil
 	}
 
-	f := outfmt.NewFormatter()
-	f.Header("ID", "TYPE", "TEXT", "TIMESTAMP")
+	fmtr := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+	fmtr.Header("ID", "TYPE", "TEXT", "TIMESTAMP")
 
 	for _, post := range posts {
-		text := post.Text
+		text := strings.ReplaceAll(post.Text, "\n", " ")
 		if len(text) > 40 {
 			text = text[:40] + "..."
 		}
-		text = strings.ReplaceAll(text, "\n", " ")
 
-		f.Row(
+		fmtr.Row(
 			post.ID,
 			post.MediaType,
 			text,
 			post.Timestamp.Format("2006-01-02 15:04"),
 		)
 	}
-	f.Flush()
+	fmtr.Flush()
 
 	return nil
 }
 
-func runPostsDelete(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	postID := args[0]
+func newPostsDeleteCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete [post-id]",
+		Short: "Delete a post",
+		Long: `Delete a post by its ID.
 
-	client, err := getClient(ctx)
+Requires confirmation unless --yes flag is provided.
+
+Example:
+  threads posts delete 12345678901234567
+  threads posts delete 12345678901234567 --yes`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsDelete(cmd, f, args[0])
+		},
+	}
+	return cmd
+}
+
+func runPostsDelete(cmd *cobra.Command, f *Factory, postID string) error {
+	ctx := cmd.Context()
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Get post details for confirmation
 	post, err := client.GetPost(ctx, threads.PostID(postID))
 	if err != nil {
 		return WrapError("failed to get post", err)
 	}
 
-	// Show post details and confirm
-	if !yesFlag {
-		fmt.Printf("Post to delete:\n")
-		fmt.Printf("  ID:   %s\n", post.ID)
-		fmt.Printf("  Type: %s\n", post.MediaType)
+	io := iocontext.GetIO(ctx)
+	if !outfmt.GetYes(ctx) {
+		fmt.Fprintln(io.Out, "Post to delete:")             //nolint:errcheck // Best-effort output
+		fmt.Fprintf(io.Out, "  ID:   %s\n", post.ID)        //nolint:errcheck // Best-effort output
+		fmt.Fprintf(io.Out, "  Type: %s\n", post.MediaType) //nolint:errcheck // Best-effort output
 		if post.Text != "" {
 			text := post.Text
 			if len(text) > 50 {
 				text = text[:50] + "..."
 			}
-			fmt.Printf("  Text: %s\n", text)
+			fmt.Fprintf(io.Out, "  Text: %s\n", text) //nolint:errcheck // Best-effort output
 		}
-		fmt.Println()
+		fmt.Fprintln(io.Out) //nolint:errcheck // Best-effort output
 
-		if !confirm("Delete this post?") {
-			fmt.Println("Cancelled.")
+		if !f.Confirm(ctx, "Delete this post?") {
+			fmt.Fprintln(io.Out, "Cancelled.") //nolint:errcheck // Best-effort output
 			return nil
 		}
 	}
@@ -471,34 +472,59 @@ func runPostsDelete(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to delete post", err)
 	}
 
-	ui.Success("Post deleted successfully")
+	f.UI(ctx).Success("Post deleted successfully")
 	return nil
 }
 
-var postsCarouselCmd = &cobra.Command{
-	Use:   "carousel",
-	Short: "Create a carousel post with multiple images/videos",
-	Long: `Create a carousel post with 2-20 media items.
+type postsCarouselOptions struct {
+	Items       []string
+	Text        string
+	AltTexts    []string
+	ReplyTo     string
+	TimeoutSecs int
+}
+
+func newPostsCarouselCmd(f *Factory) *cobra.Command {
+	opts := &postsCarouselOptions{
+		TimeoutSecs: 300,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "carousel",
+		Short: "Create a carousel post with multiple images/videos",
+		Long: `Create a carousel post with 2-20 media items.
 
 Each item should be a URL to an image or video. Alt text can be provided
 for accessibility using --alt-text (one per item, in order).`,
-	Example: `  # Create carousel with 3 images
+		Example: `  # Create carousel with 3 images
   threads posts carousel --items url1,url2,url3
 
   # With caption and alt text
   threads posts carousel --items url1,url2 --text "My photos" --alt-text "First" --alt-text "Second"`,
-	RunE: runPostsCarousel,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsCarousel(cmd, f, opts)
+		},
+	}
+
+	cmd.Flags().StringSliceVar(&opts.Items, "items", nil, "Media URLs (comma-separated)")
+	cmd.Flags().StringVar(&opts.Text, "text", "", "Caption text")
+	cmd.Flags().StringSliceVar(&opts.AltTexts, "alt-text", nil, "Alt text for each item (in order)")
+	cmd.Flags().StringVar(&opts.ReplyTo, "reply-to", "", "Post ID to reply to")
+	cmd.Flags().IntVar(&opts.TimeoutSecs, "timeout", 300, "Timeout in seconds for container processing")
+	//nolint:errcheck,gosec // MarkFlagRequired cannot fail for a flag that exists
+	cmd.MarkFlagRequired("items")
+
+	return cmd
 }
 
-func runPostsCarousel(cmd *cobra.Command, args []string) error {
-	// Validate: 2-20 items required
-	if len(carouselItems) < 2 {
+func runPostsCarousel(cmd *cobra.Command, f *Factory, opts *postsCarouselOptions) error {
+	if len(opts.Items) < 2 {
 		return &UserFriendlyError{
 			Message:    "Carousel requires at least 2 items",
 			Suggestion: "Add more items with --items or use 'threads posts create' for a single media post",
 		}
 	}
-	if len(carouselItems) > 20 {
+	if len(opts.Items) > 20 {
 		return &UserFriendlyError{
 			Message:    "Carousel supports maximum 20 items",
 			Suggestion: "Reduce the number of items to 20 or fewer",
@@ -506,41 +532,37 @@ func runPostsCarousel(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Create media containers for each item
 	var containerIDs []string
-	for i, itemURL := range carouselItems {
+	for i, itemURL := range opts.Items {
 		var altText string
-		if i < len(carouselAltTexts) {
-			altText = carouselAltTexts[i]
+		if i < len(opts.AltTexts) {
+			altText = opts.AltTexts[i]
 		}
 
-		// Detect media type from URL
 		mediaType := detectMediaType(itemURL)
 		containerID, errContainer := client.CreateMediaContainer(ctx, mediaType, itemURL, altText)
 		if errContainer != nil {
 			return WrapError(fmt.Sprintf("failed to create container for item %d", i+1), errContainer)
 		}
 
-		// Wait for container to be ready
-		if errWait := waitForContainer(ctx, client, containerID, carouselWaitTimeout); errWait != nil {
+		if errWait := waitForContainer(ctx, client, containerID, opts.TimeoutSecs); errWait != nil {
 			return WrapError(fmt.Sprintf("container %d not ready", i+1), errWait)
 		}
 
 		containerIDs = append(containerIDs, string(containerID))
 	}
 
-	// Build carousel content
 	content := &threads.CarouselPostContent{
-		Text:     carouselText,
+		Text:     opts.Text,
 		Children: containerIDs,
 	}
-	if carouselReplyTo != "" {
-		content.ReplyTo = carouselReplyTo
+	if opts.ReplyTo != "" {
+		content.ReplyTo = opts.ReplyTo
 	}
 
 	post, err := client.CreateCarouselPost(ctx, content)
@@ -548,21 +570,258 @@ func runPostsCarousel(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to create carousel post", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(post, jqQuery)
+		return outfmt.WriteJSONTo(io.Out, post, outfmt.GetQuery(ctx))
 	}
 
-	ui.Success("Carousel post created successfully!")
-	fmt.Printf("  ID:        %s\n", post.ID)
-	fmt.Printf("  Permalink: %s\n", post.Permalink)
+	f.UI(ctx).Success("Carousel post created successfully!")
+	fmt.Fprintf(io.Out, "  ID:        %s\n", post.ID)        //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Permalink: %s\n", post.Permalink) //nolint:errcheck // Best-effort output
 	if post.Text != "" {
 		text := post.Text
 		if len(text) > 50 {
 			text = text[:50] + "..."
 		}
-		fmt.Printf("  Text:      %s\n", text)
+		fmt.Fprintf(io.Out, "  Text:      %s\n", text) //nolint:errcheck // Best-effort output
 	}
-	fmt.Printf("  Items:     %d\n", len(containerIDs))
+	fmt.Fprintf(io.Out, "  Items:     %d\n", len(containerIDs)) //nolint:errcheck // Best-effort output
+
+	return nil
+}
+
+func newPostsQuoteCmd(f *Factory) *cobra.Command {
+	var text string
+	var imageURL string
+	var videoURL string
+
+	cmd := &cobra.Command{
+		Use:   "quote [post-id]",
+		Short: "Create a quote post",
+		Long:  "Quote an existing post with optional text, image, or video.",
+		Args:  cobra.ExactArgs(1),
+		Example: `  # Quote with text
+  threads posts quote 12345 --text "Great point!"
+
+  # Quote with image
+  threads posts quote 12345 --image https://example.com/image.jpg --text "Check this out"`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			quotedPostID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			var content interface{}
+			switch {
+			case videoURL != "":
+				content = &threads.VideoPostContent{
+					VideoURL: videoURL,
+					Text:     text,
+				}
+			case imageURL != "":
+				content = &threads.ImagePostContent{
+					ImageURL: imageURL,
+					Text:     text,
+				}
+			default:
+				content = &threads.TextPostContent{
+					Text: text,
+				}
+			}
+
+			post, err := client.CreateQuotePost(ctx, content, quotedPostID)
+			if err != nil {
+				return WrapError("failed to create quote post", err)
+			}
+
+			io := iocontext.GetIO(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+			return out.Output(post)
+		},
+	}
+
+	cmd.Flags().StringVar(&text, "text", "", "Quote text")
+	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to include")
+	cmd.Flags().StringVar(&videoURL, "video", "", "Video URL to include")
+
+	return cmd
+}
+
+func newPostsRepostCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "repost [post-id]",
+		Short:   "Repost an existing post",
+		Args:    cobra.ExactArgs(1),
+		Example: `  threads posts repost 12345`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			postID := args[0]
+			ctx := cmd.Context()
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			post, err := client.RepostPost(ctx, threads.PostID(postID))
+			if err != nil {
+				return WrapError("failed to repost", err)
+			}
+
+			io := iocontext.GetIO(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+			return out.Output(post)
+		},
+	}
+	return cmd
+}
+
+func newPostsUnrepostCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unrepost [repost-id]",
+		Short: "Remove a repost",
+		Long: `Remove a repost by its ID.
+
+This undoes a repost action. Note that you need the repost ID, not the original post ID.
+The repost ID is returned when you create a repost.
+
+Requires confirmation unless --yes flag is provided.`,
+		Args: cobra.ExactArgs(1),
+		Example: `  # Remove a repost with confirmation
+  threads posts unrepost 12345678901234567
+
+  # Remove a repost without confirmation
+  threads posts unrepost 12345678901234567 --yes`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			repostID := args[0]
+
+			client, err := f.Client(ctx)
+			if err != nil {
+				return err
+			}
+
+			io := iocontext.GetIO(ctx)
+			if !outfmt.GetYes(ctx) {
+				fmt.Fprintf(io.Out, "Repost to remove: %s\n\n", repostID) //nolint:errcheck // Best-effort output
+				if !f.Confirm(ctx, "Remove this repost?") {
+					fmt.Fprintln(io.Out, "Cancelled.") //nolint:errcheck // Best-effort output
+					return nil
+				}
+			}
+
+			if err := client.UnrepostPost(ctx, threads.PostID(repostID)); err != nil {
+				return WrapError("failed to unrepost", err)
+			}
+
+			f.UI(ctx).Success("Repost removed successfully")
+			return nil
+		},
+	}
+	return cmd
+}
+
+func newPostsGhostListCmd(f *Factory) *cobra.Command {
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "ghost-list",
+		Short: "List ghost posts",
+		Long: `List ghost posts from the authenticated user.
+
+Ghost posts are text-only posts that automatically expire after 24 hours.
+They do not allow replies.
+
+Examples:
+  # List ghost posts
+  threads posts ghost-list
+
+  # List with pagination
+  threads posts ghost-list --limit 10
+
+  # Output as JSON
+  threads posts ghost-list --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPostsGhostList(cmd, f, limit)
+		},
+	}
+
+	cmd.Flags().IntVar(&limit, "limit", 25, "Maximum number of results")
+	return cmd
+}
+
+func runPostsGhostList(cmd *cobra.Command, f *Factory, limit int) error {
+	ctx := cmd.Context()
+
+	client, err := f.Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	me, err := client.GetMe(ctx)
+	if err != nil {
+		return WrapError("failed to get user info", err)
+	}
+
+	opts := &threads.PaginationOptions{}
+	if limit > 0 {
+		opts.Limit = limit
+	}
+
+	postsResp, err := client.GetUserGhostPosts(ctx, threads.UserID(me.ID), opts)
+	if err != nil {
+		return WrapError("failed to list ghost posts", err)
+	}
+
+	posts := postsResp.Data
+	if limit > 0 && len(posts) > limit {
+		posts = posts[:limit]
+	}
+
+	io := iocontext.GetIO(ctx)
+	if outfmt.IsJSON(ctx) {
+		return outfmt.WriteJSONTo(io.Out, map[string]any{
+			"posts":  posts,
+			"paging": postsResp.Paging,
+		}, outfmt.GetQuery(ctx))
+	}
+
+	if len(posts) == 0 {
+		f.UI(ctx).Info("No ghost posts found")
+		return nil
+	}
+
+	fmtr := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+	fmtr.Header("ID", "TEXT", "EXPIRES", "STATUS")
+
+	for _, post := range posts {
+		text := strings.ReplaceAll(post.Text, "\n", " ")
+		if len(text) > 40 {
+			text = text[:40] + "..."
+		}
+
+		expires := "N/A"
+		if !post.GhostPostExpirationTimestamp.IsZero() {
+			absTime := post.GhostPostExpirationTimestamp.Format("2006-01-02 15:04")
+			relTime := ui.FormatRelativeTime(post.GhostPostExpirationTimestamp.Time)
+			expires = fmt.Sprintf("%s (%s)", absTime, relTime)
+		}
+
+		status := post.GhostPostStatus
+		if status == "" {
+			status = "active"
+		}
+
+		fmtr.Row(
+			post.ID,
+			text,
+			expires,
+			status,
+		)
+	}
+	fmtr.Flush()
 
 	return nil
 }
@@ -570,7 +829,6 @@ func runPostsCarousel(cmd *cobra.Command, args []string) error {
 // detectMediaType determines if URL is image or video based on file extension
 func detectMediaType(rawURL string) string {
 	lower := strings.ToLower(rawURL)
-	// Remove query parameters for extension matching
 	if idx := strings.Index(lower, "?"); idx != -1 {
 		lower = lower[:idx]
 	}
@@ -585,7 +843,6 @@ func detectMediaType(rawURL string) string {
 
 // waitForContainer polls container status until ready or timeout
 func waitForContainer(ctx context.Context, client *threads.Client, containerID threads.ContainerID, timeoutSecs int) error {
-	// Check status immediately first
 	status, err := client.GetContainerStatus(ctx, containerID)
 	if err != nil {
 		return FormatError(err)
@@ -605,7 +862,6 @@ func waitForContainer(ctx context.Context, client *threads.Client, containerID t
 		}
 	}
 
-	// If not ready, start polling
 	timeout := time.After(time.Duration(timeoutSecs) * time.Second)
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -641,235 +897,6 @@ func waitForContainer(ctx context.Context, client *threads.Client, containerID t
 					Suggestion: "Re-upload the media and publish immediately after container creation",
 				}
 			}
-			// Still IN_PROGRESS, continue waiting
 		}
 	}
-}
-
-func newPostsQuoteCmd() *cobra.Command {
-	var text string
-	var imageURL string
-	var videoURL string
-
-	cmd := &cobra.Command{
-		Use:   "quote [post-id]",
-		Short: "Create a quote post",
-		Long:  "Quote an existing post with optional text, image, or video.",
-		Args:  cobra.ExactArgs(1),
-		Example: `  # Quote with text
-  threads posts quote 12345 --text "Great point!"
-
-  # Quote with image
-  threads posts quote 12345 --image https://example.com/image.jpg --text "Check this out"`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			quotedPostID := args[0]
-
-			client, err := getClient(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			var content interface{}
-			switch {
-			case videoURL != "":
-				content = &threads.VideoPostContent{
-					VideoURL: videoURL,
-					Text:     text,
-				}
-			case imageURL != "":
-				content = &threads.ImagePostContent{
-					ImageURL: imageURL,
-					Text:     text,
-				}
-			default:
-				content = &threads.TextPostContent{
-					Text: text,
-				}
-			}
-
-			post, err := client.CreateQuotePost(cmd.Context(), content, quotedPostID)
-			if err != nil {
-				return WrapError("failed to create quote post", err)
-			}
-
-			f := outfmt.FromContext(cmd.Context())
-			return f.Output(post)
-		},
-	}
-
-	cmd.Flags().StringVar(&text, "text", "", "Quote text")
-	cmd.Flags().StringVar(&imageURL, "image", "", "Image URL to include")
-	cmd.Flags().StringVar(&videoURL, "video", "", "Video URL to include")
-
-	return cmd
-}
-
-func newPostsRepostCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "repost [post-id]",
-		Short:   "Repost an existing post",
-		Args:    cobra.ExactArgs(1),
-		Example: `  threads posts repost 12345`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			postID := args[0]
-
-			client, err := getClient(cmd.Context())
-			if err != nil {
-				return err
-			}
-
-			post, err := client.RepostPost(cmd.Context(), threads.PostID(postID))
-			if err != nil {
-				return WrapError("failed to repost", err)
-			}
-
-			f := outfmt.FromContext(cmd.Context())
-			return f.Output(post)
-		},
-	}
-	return cmd
-}
-
-func newPostsUnrepostCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "unrepost [repost-id]",
-		Short: "Remove a repost",
-		Long: `Remove a repost by its ID.
-
-This undoes a repost action. Note that you need the repost ID, not the original post ID.
-The repost ID is returned when you create a repost.
-
-Requires confirmation unless --yes flag is provided.`,
-		Args: cobra.ExactArgs(1),
-		Example: `  # Remove a repost with confirmation
-  threads posts unrepost 12345678901234567
-
-  # Remove a repost without confirmation
-  threads posts unrepost 12345678901234567 --yes`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-			repostID := args[0]
-
-			client, err := getClient(ctx)
-			if err != nil {
-				return err
-			}
-
-			// Show confirmation unless --yes is set
-			if !yesFlag {
-				fmt.Printf("Repost to remove: %s\n\n", repostID)
-
-				if !confirm("Remove this repost?") {
-					fmt.Println("Cancelled.")
-					return nil
-				}
-			}
-
-			if err := client.UnrepostPost(ctx, threads.PostID(repostID)); err != nil {
-				return WrapError("failed to unrepost", err)
-			}
-
-			ui.Success("Repost removed successfully")
-			return nil
-		},
-	}
-	return cmd
-}
-
-func newPostsGhostListCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "ghost-list",
-		Short: "List ghost posts",
-		Long: `List ghost posts from the authenticated user.
-
-Ghost posts are text-only posts that automatically expire after 24 hours.
-They do not allow replies.
-
-Examples:
-  # List ghost posts
-  threads posts ghost-list
-
-  # List with pagination
-  threads posts ghost-list --limit 10
-
-  # Output as JSON
-  threads posts ghost-list --output json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := cmd.Context()
-
-			client, err := getClient(ctx)
-			if err != nil {
-				return err
-			}
-
-			// Get user info to get user ID
-			me, err := client.GetMe(ctx)
-			if err != nil {
-				return WrapError("failed to get user info", err)
-			}
-
-			opts := &threads.PaginationOptions{}
-			if limitFlag > 0 {
-				opts.Limit = limitFlag
-			}
-
-			postsResp, err := client.GetUserGhostPosts(ctx, threads.UserID(me.ID), opts)
-			if err != nil {
-				return WrapError("failed to list ghost posts", err)
-			}
-
-			// Apply limit if specified
-			posts := postsResp.Data
-			if limitFlag > 0 && len(posts) > limitFlag {
-				posts = posts[:limitFlag]
-			}
-
-			if outfmt.IsJSON(ctx) {
-				return outfmt.WriteJSON(map[string]any{
-					"posts":  posts,
-					"paging": postsResp.Paging,
-				}, jqQuery)
-			}
-
-			if len(posts) == 0 {
-				ui.Info("No ghost posts found")
-				return nil
-			}
-
-			f := outfmt.NewFormatter()
-			f.Header("ID", "TEXT", "EXPIRES", "STATUS")
-
-			for _, post := range posts {
-				text := post.Text
-				if len(text) > 40 {
-					text = text[:40] + "..."
-				}
-				text = strings.ReplaceAll(text, "\n", " ")
-
-				expires := "N/A"
-				if !post.GhostPostExpirationTimestamp.IsZero() {
-					absTime := post.GhostPostExpirationTimestamp.Format("2006-01-02 15:04")
-					relTime := ui.FormatRelativeTime(post.GhostPostExpirationTimestamp.Time)
-					expires = fmt.Sprintf("%s (%s)", absTime, relTime)
-				}
-
-				status := post.GhostPostStatus
-				if status == "" {
-					status = "active"
-				}
-
-				f.Row(
-					post.ID,
-					text,
-					expires,
-					status,
-				)
-			}
-			f.Flush()
-
-			return nil
-		},
-	}
-
-	return cmd
 }

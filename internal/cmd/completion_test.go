@@ -5,7 +5,7 @@ import (
 )
 
 func TestCompletionCmd_Structure(t *testing.T) {
-	cmd := newCompletionCmd()
+	cmd := NewCompletionCmd()
 
 	if cmd.Use != "completion [bash|zsh|fish|powershell]" {
 		t.Errorf("expected Use='completion [bash|zsh|fish|powershell]', got %s", cmd.Use)
@@ -17,7 +17,7 @@ func TestCompletionCmd_Structure(t *testing.T) {
 }
 
 func TestCompletionCmd_ValidArgs(t *testing.T) {
-	cmd := newCompletionCmd()
+	cmd := NewCompletionCmd()
 
 	expectedShells := []string{"bash", "zsh", "fish", "powershell"}
 

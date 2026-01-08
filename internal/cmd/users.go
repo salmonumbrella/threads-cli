@@ -1,66 +1,86 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/ui"
 )
 
-var usersCmd = &cobra.Command{
-	Use:   "users",
-	Short: "Manage user profiles",
-	Long:  `Retrieve and view user profile information.`,
+// NewUsersCmd builds the users command group.
+func NewUsersCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "users",
+		Short: "Manage user profiles",
+		Long:  `Retrieve and view user profile information.`,
+	}
+
+	cmd.AddCommand(newUsersMeCmd(f))
+	cmd.AddCommand(newUsersGetCmd(f))
+	cmd.AddCommand(newUsersLookupCmd(f))
+	cmd.AddCommand(newUsersMentionsCmd(f))
+
+	return cmd
 }
 
-var usersMeCmd = &cobra.Command{
-	Use:   "me",
-	Short: "Show current authenticated user info",
-	Long:  `Display the profile information for the currently authenticated user.`,
-	RunE:  runUsersMe,
+// NewUsersMeCmd builds a top-level alias for "users me".
+func NewUsersMeCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "me",
+		Short: "Show current authenticated user info",
+		Long:  `Display the profile information for the currently authenticated user.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUsersMe(cmd, f)
+		},
+	}
 }
 
-var usersGetCmd = &cobra.Command{
-	Use:   "get [user-id]",
-	Short: "Get user by ID",
-	Long:  `Retrieve user profile information by their user ID.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runUsersGet,
+func newUsersMeCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "me",
+		Short: "Show current authenticated user info",
+		Long:  `Display the profile information for the currently authenticated user.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUsersMe(cmd, f)
+		},
+	}
 }
 
-var usersLookupCmd = &cobra.Command{
-	Use:   "lookup [username]",
-	Short: "Lookup public profile by username",
-	Long: `Look up a public profile by username.
+func newUsersGetCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get [user-id]",
+		Short: "Get user by ID",
+		Long:  `Retrieve user profile information by their user ID.`,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUsersGet(cmd, f, args[0])
+		},
+	}
+}
+
+func newUsersLookupCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "lookup [username]",
+		Short: "Lookup public profile by username",
+		Long: `Look up a public profile by username.
 
 The username can be provided with or without the @ prefix.
 This returns public profile information including follower counts and engagement metrics.`,
-	Args: cobra.ExactArgs(1),
-	RunE: runUsersLookup,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUsersLookup(cmd, f, args[0])
+		},
+	}
 }
 
-// meCmd is a top-level alias for "users me"
-var meCmd = &cobra.Command{
-	Use:   "me",
-	Short: "Show current authenticated user info",
-	Long:  `Display the profile information for the currently authenticated user.`,
-	RunE:  runUsersMe,
-}
-
-func init() {
-	usersCmd.AddCommand(usersMeCmd)
-	usersCmd.AddCommand(usersGetCmd)
-	usersCmd.AddCommand(usersLookupCmd)
-	usersCmd.AddCommand(newUsersMentionsCmd())
-}
-
-func runUsersMe(cmd *cobra.Command, args []string) error {
+func runUsersMe(cmd *cobra.Command, f *Factory) error {
 	ctx := cmd.Context()
 
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -70,19 +90,19 @@ func runUsersMe(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to get user info", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(userToMap(user), jqQuery)
+		return outfmt.WriteJSONTo(io.Out, userToMap(user), outfmt.GetQuery(ctx))
 	}
 
-	printUserText(user)
+	printUserText(cmd.Context(), f, user)
 	return nil
 }
 
-func runUsersGet(cmd *cobra.Command, args []string) error {
+func runUsersGet(cmd *cobra.Command, f *Factory, userID string) error {
 	ctx := cmd.Context()
-	userID := args[0]
 
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -92,19 +112,19 @@ func runUsersGet(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to get user", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(userToMap(user), jqQuery)
+		return outfmt.WriteJSONTo(io.Out, userToMap(user), outfmt.GetQuery(ctx))
 	}
 
-	printUserText(user)
+	printUserText(ctx, f, user)
 	return nil
 }
 
-func runUsersLookup(cmd *cobra.Command, args []string) error {
+func runUsersLookup(cmd *cobra.Command, f *Factory, username string) error {
 	ctx := cmd.Context()
-	username := args[0]
 
-	client, err := getClient(ctx)
+	client, err := f.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,11 +134,12 @@ func runUsersLookup(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to lookup profile", err)
 	}
 
+	io := iocontext.GetIO(ctx)
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(publicUserToMap(publicUser), jqQuery)
+		return outfmt.WriteJSONTo(io.Out, publicUserToMap(publicUser), outfmt.GetQuery(ctx))
 	}
 
-	printPublicUserText(publicUser)
+	printPublicUserText(ctx, f, publicUser)
 	return nil
 }
 
@@ -152,50 +173,54 @@ func publicUserToMap(u *threads.PublicUser) map[string]any {
 }
 
 // printUserText prints a User in text format
-func printUserText(u *threads.User) {
-	ui.Success("User Profile")
-	fmt.Printf("  ID:        %s\n", u.ID)
-	fmt.Printf("  Username:  @%s\n", u.Username)
+func printUserText(ctx context.Context, f *Factory, u *threads.User) {
+	p := f.UI(ctx)
+	io := iocontext.GetIO(ctx)
+	p.Success("User Profile")
+	fmt.Fprintf(io.Out, "  ID:        %s\n", u.ID)        //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Username:  @%s\n", u.Username) //nolint:errcheck // Best-effort output
 	if u.Name != "" {
-		fmt.Printf("  Name:      %s\n", u.Name)
+		fmt.Fprintf(io.Out, "  Name:      %s\n", u.Name) //nolint:errcheck // Best-effort output
 	}
 	if u.Biography != "" {
-		fmt.Printf("  Bio:       %s\n", u.Biography)
+		fmt.Fprintf(io.Out, "  Bio:       %s\n", u.Biography) //nolint:errcheck // Best-effort output
 	}
 	if u.IsVerified {
-		fmt.Printf("  Verified:  yes\n")
+		fmt.Fprintln(io.Out, "  Verified:  yes") //nolint:errcheck // Best-effort output
 	}
 	if u.ProfilePicURL != "" {
-		fmt.Printf("  Picture:   %s\n", u.ProfilePicURL)
+		fmt.Fprintf(io.Out, "  Picture:   %s\n", u.ProfilePicURL) //nolint:errcheck // Best-effort output
 	}
 }
 
 // printPublicUserText prints a PublicUser in text format
-func printPublicUserText(u *threads.PublicUser) {
-	ui.Success("Public Profile")
-	fmt.Printf("  Username:   @%s\n", u.Username)
+func printPublicUserText(ctx context.Context, f *Factory, u *threads.PublicUser) {
+	p := f.UI(ctx)
+	io := iocontext.GetIO(ctx)
+	p.Success("Public Profile")
+	fmt.Fprintf(io.Out, "  Username:   @%s\n", u.Username) //nolint:errcheck // Best-effort output
 	if u.Name != "" {
-		fmt.Printf("  Name:       %s\n", u.Name)
+		fmt.Fprintf(io.Out, "  Name:       %s\n", u.Name) //nolint:errcheck // Best-effort output
 	}
 	if u.Biography != "" {
-		fmt.Printf("  Bio:        %s\n", u.Biography)
+		fmt.Fprintf(io.Out, "  Bio:        %s\n", u.Biography) //nolint:errcheck // Best-effort output
 	}
 	if u.IsVerified {
-		fmt.Printf("  Verified:   yes\n")
+		fmt.Fprintln(io.Out, "  Verified:   yes") //nolint:errcheck // Best-effort output
 	}
-	fmt.Println()
-	fmt.Printf("  Followers:  %d\n", u.FollowerCount)
-	fmt.Printf("  Likes:      %d\n", u.LikesCount)
-	fmt.Printf("  Replies:    %d\n", u.RepliesCount)
-	fmt.Printf("  Quotes:     %d\n", u.QuotesCount)
-	fmt.Printf("  Reposts:    %d\n", u.RepostsCount)
-	fmt.Printf("  Views:      %d\n", u.ViewsCount)
+	fmt.Fprintln(io.Out)                                       //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Followers:  %d\n", u.FollowerCount) //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Likes:      %d\n", u.LikesCount)    //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Replies:    %d\n", u.RepliesCount)  //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Quotes:     %d\n", u.QuotesCount)   //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Reposts:    %d\n", u.RepostsCount)  //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Views:      %d\n", u.ViewsCount)    //nolint:errcheck // Best-effort output
 	if u.ProfilePictureURL != "" {
-		fmt.Printf("\n  Picture:    %s\n", u.ProfilePictureURL)
+		fmt.Fprintf(io.Out, "\n  Picture:    %s\n", u.ProfilePictureURL) //nolint:errcheck // Best-effort output
 	}
 }
 
-func newUsersMentionsCmd() *cobra.Command {
+func newUsersMentionsCmd(f *Factory) *cobra.Command {
 	var limit int
 	var cursor string
 
@@ -205,14 +230,14 @@ func newUsersMentionsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			client, err := getClient(ctx)
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
 
 			me, err := client.GetMe(ctx)
 			if err != nil {
-				return err
+				return WrapError("failed to get user info", err)
 			}
 
 			opts := &threads.PaginationOptions{
@@ -222,18 +247,19 @@ func newUsersMentionsCmd() *cobra.Command {
 
 			result, err := client.GetUserMentions(ctx, threads.UserID(me.ID), opts)
 			if err != nil {
-				return err
+				return WrapError("failed to get mentions", err)
 			}
 
 			// JSON output
+			io := iocontext.GetIO(ctx)
 			if outfmt.IsJSON(ctx) {
-				return outfmt.WriteJSON(result, jqQuery)
+				return outfmt.WriteJSONTo(io.Out, result, outfmt.GetQuery(ctx))
 			}
 
-			f := outfmt.FromContext(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
 
 			if len(result.Data) == 0 {
-				f.Empty("No mentions found")
+				out.Empty("No mentions found")
 				return nil
 			}
 
@@ -252,7 +278,7 @@ func newUsersMentionsCmd() *cobra.Command {
 				}
 			}
 
-			return f.Table(headers, rows, []outfmt.ColumnType{
+			return out.Table(headers, rows, []outfmt.ColumnType{
 				outfmt.ColumnID,
 				outfmt.ColumnPlain,
 				outfmt.ColumnPlain,

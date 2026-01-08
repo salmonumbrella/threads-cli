@@ -2,12 +2,12 @@ package cmd
 
 import "testing"
 
-func TestInsightsCmd_Structure(t *testing.T) {
+func TestConfigCmd_Structure(t *testing.T) {
 	f := newTestFactory(t)
-	cmd := NewInsightsCmd(f)
+	cmd := NewConfigCmd(f)
 
-	if cmd.Use != "insights" {
-		t.Errorf("expected Use=insights, got %s", cmd.Use)
+	if cmd.Use != "config" {
+		t.Errorf("expected Use=config, got %s", cmd.Use)
 	}
 
 	if cmd.Short == "" {
@@ -15,13 +15,16 @@ func TestInsightsCmd_Structure(t *testing.T) {
 	}
 }
 
-func TestInsightsCmd_Subcommands(t *testing.T) {
+func TestConfigCmd_Subcommands(t *testing.T) {
 	f := newTestFactory(t)
-	cmd := NewInsightsCmd(f)
+	cmd := NewConfigCmd(f)
 
 	expectedSubs := map[string]bool{
-		"post":    true,
-		"account": true,
+		"path":  true,
+		"list":  true,
+		"get":   true,
+		"set":   true,
+		"unset": true,
 	}
 
 	for _, sub := range cmd.Commands() {

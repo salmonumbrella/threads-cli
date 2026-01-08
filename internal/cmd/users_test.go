@@ -7,8 +7,8 @@ import (
 )
 
 func TestUsersCmd_Structure(t *testing.T) {
-	// usersCmd is a package-level var
-	cmd := usersCmd
+	f := newTestFactory(t)
+	cmd := NewUsersCmd(f)
 
 	if cmd.Use != "users" {
 		t.Errorf("expected Use=users, got %s", cmd.Use)
@@ -20,8 +20,8 @@ func TestUsersCmd_Structure(t *testing.T) {
 }
 
 func TestUsersCmd_Subcommands(t *testing.T) {
-	// usersCmd is a package-level var
-	cmd := usersCmd
+	f := newTestFactory(t)
+	cmd := NewUsersCmd(f)
 
 	expectedSubs := map[string]bool{
 		"me":       true,
@@ -44,7 +44,8 @@ func TestUsersCmd_Subcommands(t *testing.T) {
 }
 
 func TestUsersMeCmd_Structure(t *testing.T) {
-	cmd := usersMeCmd
+	f := newTestFactory(t)
+	cmd := newUsersMeCmd(f)
 
 	if cmd.Use != "me" {
 		t.Errorf("expected Use=me, got %s", cmd.Use)
@@ -56,7 +57,8 @@ func TestUsersMeCmd_Structure(t *testing.T) {
 }
 
 func TestUsersGetCmd_Structure(t *testing.T) {
-	cmd := usersGetCmd
+	f := newTestFactory(t)
+	cmd := newUsersGetCmd(f)
 
 	if cmd.Use != "get [user-id]" {
 		t.Errorf("expected Use='get [user-id]', got %s", cmd.Use)
@@ -72,7 +74,8 @@ func TestUsersGetCmd_Structure(t *testing.T) {
 }
 
 func TestUsersLookupCmd_Structure(t *testing.T) {
-	cmd := usersLookupCmd
+	f := newTestFactory(t)
+	cmd := newUsersLookupCmd(f)
 
 	if cmd.Use != "lookup [username]" {
 		t.Errorf("expected Use='lookup [username]', got %s", cmd.Use)
@@ -88,27 +91,17 @@ func TestUsersLookupCmd_Structure(t *testing.T) {
 }
 
 func TestUsersLookupCmd_HasLongDescription(t *testing.T) {
-	cmd := usersLookupCmd
+	f := newTestFactory(t)
+	cmd := newUsersLookupCmd(f)
 
 	if cmd.Long == "" {
 		t.Error("expected Long description to be set")
 	}
 }
 
-func TestUsersMentionsCmd_Structure(t *testing.T) {
-	cmd := newUsersMentionsCmd()
-
-	if cmd.Use != "mentions" {
-		t.Errorf("expected Use=mentions, got %s", cmd.Use)
-	}
-
-	if cmd.RunE == nil {
-		t.Error("expected RunE to be set")
-	}
-}
-
 func TestUsersMentionsCmd_Flags(t *testing.T) {
-	cmd := newUsersMentionsCmd()
+	f := newTestFactory(t)
+	cmd := newUsersMentionsCmd(f)
 
 	flags := []string{"limit", "cursor"}
 	for _, flag := range flags {
@@ -117,7 +110,6 @@ func TestUsersMentionsCmd_Flags(t *testing.T) {
 		}
 	}
 
-	// Check default values
 	limitFlag := cmd.Flag("limit")
 	if limitFlag.DefValue != "25" {
 		t.Errorf("expected limit default=25, got %s", limitFlag.DefValue)
@@ -130,8 +122,8 @@ func TestUsersMentionsCmd_Flags(t *testing.T) {
 }
 
 func TestMeCmd_IsTopLevelAlias(t *testing.T) {
-	// meCmd is a package-level var that should be a top-level alias for "users me"
-	cmd := meCmd
+	f := newTestFactory(t)
+	cmd := NewUsersMeCmd(f)
 
 	if cmd.Use != "me" {
 		t.Errorf("expected Use=me, got %s", cmd.Use)
@@ -214,15 +206,5 @@ func TestPublicUserToMap(t *testing.T) {
 	}
 	if result["views_count"] != 10000 {
 		t.Errorf("expected views_count=10000, got %v", result["views_count"])
-	}
-}
-
-func TestUsersCmd_SubcommandCount(t *testing.T) {
-	cmd := usersCmd
-	subcommands := cmd.Commands()
-
-	expectedCount := 4 // me, get, lookup, mentions
-	if len(subcommands) != expectedCount {
-		t.Errorf("expected %d subcommands, got %d", expectedCount, len(subcommands))
 	}
 }

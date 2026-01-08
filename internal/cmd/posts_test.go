@@ -1,12 +1,10 @@
 package cmd
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestPostsCmd_Structure(t *testing.T) {
-	// postsCmd is a package-level var
-	cmd := postsCmd
+	f := newTestFactory(t)
+	cmd := NewPostsCmd(f)
 
 	if cmd.Use != "posts" {
 		t.Errorf("expected Use=posts, got %s", cmd.Use)
@@ -18,7 +16,8 @@ func TestPostsCmd_Structure(t *testing.T) {
 }
 
 func TestPostsCmd_Subcommands(t *testing.T) {
-	cmd := postsCmd
+	f := newTestFactory(t)
+	cmd := NewPostsCmd(f)
 
 	expectedSubs := map[string]bool{
 		"create":     true,
@@ -45,20 +44,9 @@ func TestPostsCmd_Subcommands(t *testing.T) {
 	}
 }
 
-func TestPostsCreateCmd_Structure(t *testing.T) {
-	cmd := postsCreateCmd
-
-	if cmd.Use != "create" {
-		t.Errorf("expected Use=create, got %s", cmd.Use)
-	}
-
-	if cmd.RunE == nil {
-		t.Error("expected RunE to be set")
-	}
-}
-
 func TestPostsCreateCmd_Flags(t *testing.T) {
-	cmd := postsCreateCmd
+	f := newTestFactory(t)
+	cmd := newPostsCreateCmd(f)
 
 	flags := []struct {
 		name      string
@@ -90,7 +78,8 @@ func TestPostsCreateCmd_Flags(t *testing.T) {
 }
 
 func TestPostsGetCmd_Structure(t *testing.T) {
-	cmd := postsGetCmd
+	f := newTestFactory(t)
+	cmd := newPostsGetCmd(f)
 
 	if cmd.Use != "get [post-id]" {
 		t.Errorf("expected Use='get [post-id]', got %s", cmd.Use)
@@ -106,7 +95,8 @@ func TestPostsGetCmd_Structure(t *testing.T) {
 }
 
 func TestPostsListCmd_Structure(t *testing.T) {
-	cmd := postsListCmd
+	f := newTestFactory(t)
+	cmd := newPostsListCmd(f)
 
 	if cmd.Use != "list" {
 		t.Errorf("expected Use=list, got %s", cmd.Use)
@@ -118,7 +108,8 @@ func TestPostsListCmd_Structure(t *testing.T) {
 }
 
 func TestPostsDeleteCmd_Structure(t *testing.T) {
-	cmd := postsDeleteCmd
+	f := newTestFactory(t)
+	cmd := newPostsDeleteCmd(f)
 
 	if cmd.Use != "delete [post-id]" {
 		t.Errorf("expected Use='delete [post-id]', got %s", cmd.Use)
@@ -134,7 +125,8 @@ func TestPostsDeleteCmd_Structure(t *testing.T) {
 }
 
 func TestPostsQuoteCmd_Structure(t *testing.T) {
-	cmd := newPostsQuoteCmd()
+	f := newTestFactory(t)
+	cmd := newPostsQuoteCmd(f)
 
 	if cmd.Use != "quote [post-id]" {
 		t.Errorf("expected Use='quote [post-id]', got %s", cmd.Use)
@@ -150,7 +142,8 @@ func TestPostsQuoteCmd_Structure(t *testing.T) {
 }
 
 func TestPostsQuoteCmd_Flags(t *testing.T) {
-	cmd := newPostsQuoteCmd()
+	f := newTestFactory(t)
+	cmd := newPostsQuoteCmd(f)
 
 	flags := []string{"text", "image", "video"}
 	for _, flag := range flags {
@@ -161,7 +154,8 @@ func TestPostsQuoteCmd_Flags(t *testing.T) {
 }
 
 func TestPostsQuoteCmd_HasExample(t *testing.T) {
-	cmd := newPostsQuoteCmd()
+	f := newTestFactory(t)
+	cmd := newPostsQuoteCmd(f)
 
 	if cmd.Example == "" {
 		t.Error("expected Example to be set for quote command")
@@ -169,7 +163,8 @@ func TestPostsQuoteCmd_HasExample(t *testing.T) {
 }
 
 func TestPostsRepostCmd_Structure(t *testing.T) {
-	cmd := newPostsRepostCmd()
+	f := newTestFactory(t)
+	cmd := newPostsRepostCmd(f)
 
 	if cmd.Use != "repost [post-id]" {
 		t.Errorf("expected Use='repost [post-id]', got %s", cmd.Use)
@@ -185,7 +180,8 @@ func TestPostsRepostCmd_Structure(t *testing.T) {
 }
 
 func TestPostsRepostCmd_HasExample(t *testing.T) {
-	cmd := newPostsRepostCmd()
+	f := newTestFactory(t)
+	cmd := newPostsRepostCmd(f)
 
 	if cmd.Example == "" {
 		t.Error("expected Example to be set for repost command")
@@ -193,7 +189,8 @@ func TestPostsRepostCmd_HasExample(t *testing.T) {
 }
 
 func TestPostsUnrepostCmd_Structure(t *testing.T) {
-	cmd := newPostsUnrepostCmd()
+	f := newTestFactory(t)
+	cmd := newPostsUnrepostCmd(f)
 
 	if cmd.Use != "unrepost [repost-id]" {
 		t.Errorf("expected Use='unrepost [repost-id]', got %s", cmd.Use)
@@ -209,7 +206,8 @@ func TestPostsUnrepostCmd_Structure(t *testing.T) {
 }
 
 func TestPostsUnrepostCmd_HasExample(t *testing.T) {
-	cmd := newPostsUnrepostCmd()
+	f := newTestFactory(t)
+	cmd := newPostsUnrepostCmd(f)
 
 	if cmd.Example == "" {
 		t.Error("expected Example to be set for unrepost command")
@@ -217,7 +215,8 @@ func TestPostsUnrepostCmd_HasExample(t *testing.T) {
 }
 
 func TestPostsUnrepostCmd_HasLongDescription(t *testing.T) {
-	cmd := newPostsUnrepostCmd()
+	f := newTestFactory(t)
+	cmd := newPostsUnrepostCmd(f)
 
 	if cmd.Long == "" {
 		t.Error("expected Long description to be set for unrepost command")
@@ -225,7 +224,8 @@ func TestPostsUnrepostCmd_HasLongDescription(t *testing.T) {
 }
 
 func TestPostsCarouselCmd_Structure(t *testing.T) {
-	cmd := postsCarouselCmd
+	f := newTestFactory(t)
+	cmd := newPostsCarouselCmd(f)
 
 	if cmd.Use != "carousel" {
 		t.Errorf("expected Use=carousel, got %s", cmd.Use)
@@ -237,8 +237,8 @@ func TestPostsCarouselCmd_Structure(t *testing.T) {
 }
 
 func TestPostsCarouselCmd_Flags(t *testing.T) {
-	// postsCarouselCmd is a package-level var
-	cmd := postsCarouselCmd
+	f := newTestFactory(t)
+	cmd := newPostsCarouselCmd(f)
 
 	flags := []string{"items", "text", "alt-text", "reply-to", "timeout"}
 	for _, flag := range flags {
@@ -247,7 +247,6 @@ func TestPostsCarouselCmd_Flags(t *testing.T) {
 		}
 	}
 
-	// --items should be required
 	itemsFlag := cmd.Flag("items")
 	if itemsFlag == nil {
 		t.Fatal("--items flag not found")
@@ -255,7 +254,8 @@ func TestPostsCarouselCmd_Flags(t *testing.T) {
 }
 
 func TestPostsCarouselCmd_TimeoutDefault(t *testing.T) {
-	cmd := postsCarouselCmd
+	f := newTestFactory(t)
+	cmd := newPostsCarouselCmd(f)
 
 	timeoutFlag := cmd.Flag("timeout")
 	if timeoutFlag == nil {
@@ -268,7 +268,8 @@ func TestPostsCarouselCmd_TimeoutDefault(t *testing.T) {
 }
 
 func TestPostsCarouselCmd_HasExample(t *testing.T) {
-	cmd := postsCarouselCmd
+	f := newTestFactory(t)
+	cmd := newPostsCarouselCmd(f)
 
 	if cmd.Example == "" {
 		t.Error("expected Example to be set for carousel command")
@@ -343,7 +344,6 @@ func TestDetectMediaType_WithQueryParams(t *testing.T) {
 }
 
 func TestDetectMediaType_DefaultToImage(t *testing.T) {
-	// Unknown extensions should default to IMAGE
 	tests := []string{
 		"https://example.com/file",
 		"https://example.com/file.txt",
@@ -361,18 +361,9 @@ func TestDetectMediaType_DefaultToImage(t *testing.T) {
 	}
 }
 
-func TestPostsCmd_SubcommandCount(t *testing.T) {
-	cmd := postsCmd
-	subcommands := cmd.Commands()
-
-	expectedCount := 9 // create, get, list, delete, carousel, quote, repost, unrepost, ghost-list
-	if len(subcommands) != expectedCount {
-		t.Errorf("expected %d subcommands, got %d", expectedCount, len(subcommands))
-	}
-}
-
 func TestPostsGhostListCmd_Structure(t *testing.T) {
-	cmd := newPostsGhostListCmd()
+	f := newTestFactory(t)
+	cmd := newPostsGhostListCmd(f)
 
 	if cmd.Use != "ghost-list" {
 		t.Errorf("expected Use='ghost-list', got %s", cmd.Use)

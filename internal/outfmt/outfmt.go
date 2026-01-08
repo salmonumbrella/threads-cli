@@ -20,6 +20,16 @@ const (
 	JSON
 )
 
+// ParseFormat parses an output format string.
+func ParseFormat(value string) Format {
+	switch value {
+	case "json":
+		return JSON
+	default:
+		return Text
+	}
+}
+
 type contextKey string
 
 const (
@@ -27,7 +37,29 @@ const (
 	queryKey  contextKey = "output_query"
 	yesKey    contextKey = "yes_flag"
 	limitKey  contextKey = "limit_flag"
+	colorKey  contextKey = "output_color"
 )
+
+// ColorMode controls colored output.
+type ColorMode string
+
+const (
+	ColorAuto   ColorMode = "auto"
+	ColorAlways ColorMode = "always"
+	ColorNever  ColorMode = "never"
+)
+
+// ParseColorMode parses a color mode string.
+func ParseColorMode(value string) ColorMode {
+	switch value {
+	case string(ColorAlways):
+		return ColorAlways
+	case string(ColorNever):
+		return ColorNever
+	default:
+		return ColorAuto
+	}
+}
 
 // ColumnType defines how a column should be formatted
 type ColumnType int
@@ -160,6 +192,19 @@ func WithLimit(ctx context.Context, limit int) context.Context {
 	return context.WithValue(ctx, limitKey, limit)
 }
 
+// WithColorMode adds color mode to context
+func WithColorMode(ctx context.Context, mode ColorMode) context.Context {
+	return context.WithValue(ctx, colorKey, mode)
+}
+
+// GetColorMode retrieves color mode from context
+func GetColorMode(ctx context.Context) ColorMode {
+	if m, ok := ctx.Value(colorKey).(ColorMode); ok {
+		return m
+	}
+	return ColorAuto
+}
+
 // GetLimit retrieves limit from context
 func GetLimit(ctx context.Context) int {
 	if l, ok := ctx.Value(limitKey).(int); ok {
@@ -186,7 +231,7 @@ func Output(ctx context.Context, data any, textFormatter func()) error {
 	format := GetFormat(ctx)
 	switch format {
 	case JSON:
-		return WriteJSON(data, "")
+		return WriteJSONTo(os.Stdout, data, "")
 	default:
 		textFormatter()
 		return nil
@@ -195,16 +240,26 @@ func Output(ctx context.Context, data any, textFormatter func()) error {
 
 // WriteJSON outputs JSON, optionally filtered by JQ query
 func WriteJSON(data any, query string) error {
+	return WriteJSONTo(os.Stdout, data, query)
+}
+
+// WriteJSONTo outputs JSON to a writer, optionally filtered by JQ query.
+func WriteJSONTo(w io.Writer, data any, query string) error {
 	if query != "" {
-		return writeFilteredJSON(data, query)
+		return writeFilteredJSONTo(w, data, query)
 	}
 
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(data)
 }
 
+// writeFilteredJSON is a legacy helper that writes to stdout.
 func writeFilteredJSON(data any, query string) error {
+	return writeFilteredJSONTo(os.Stdout, data, query)
+}
+
+func writeFilteredJSONTo(w io.Writer, data any, query string) error {
 	q, err := gojq.Parse(query)
 	if err != nil {
 		return fmt.Errorf("invalid jq query: %w", err)
@@ -226,7 +281,7 @@ func writeFilteredJSON(data any, query string) error {
 	}
 
 	iter := code.Run(input)
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 
 	for {
@@ -314,7 +369,15 @@ func (f *Formatter) Flush() {
 // colorEnabled checks if color output is enabled
 // Color is disabled if NO_COLOR env is set or stdout is not a TTY
 func (f *Formatter) colorEnabled() bool {
-	// Check NO_COLOR environment variable (https://no-color.org/)
+	mode := GetColorMode(f.ctx)
+	switch mode {
+	case ColorAlways:
+		return true
+	case ColorNever:
+		return false
+	}
+
+	// Auto mode: honor NO_COLOR env (https://no-color.org/)
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}

@@ -8,17 +8,21 @@ import (
 	"github.com/spf13/cobra"
 
 	threads "github.com/salmonumbrella/threads-go"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
 )
 
-func newSearchCmd() *cobra.Command {
-	var limit int
-	var cursor string
-	var mediaType string
-	var since string
-	var until string
-	var mode string
-	var searchType string
+// NewSearchCmd builds the search command.
+func NewSearchCmd(f *Factory) *cobra.Command {
+	var (
+		limit      int
+		cursor     string
+		mediaType  string
+		since      string
+		until      string
+		mode       string
+		searchType string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "search [query]",
@@ -43,7 +47,7 @@ Results can be sorted by popularity (top) or recency (recent).`,
 			query := args[0]
 			ctx := cmd.Context()
 
-			client, err := getClient(ctx)
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
@@ -110,14 +114,15 @@ Results can be sorted by popularity (top) or recency (recent).`,
 				return WrapError("search failed", err)
 			}
 
+			io := iocontext.GetIO(ctx)
 			if outfmt.IsJSON(ctx) {
-				return outfmt.WriteJSON(result, jqQuery)
+				return outfmt.WriteJSONTo(io.Out, result, outfmt.GetQuery(ctx))
 			}
 
-			f := outfmt.FromContext(ctx)
+			out := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
 
 			if len(result.Data) == 0 {
-				f.Empty("No results found")
+				out.Empty("No results found")
 				return nil
 			}
 
@@ -139,7 +144,7 @@ Results can be sorted by popularity (top) or recency (recent).`,
 				}
 			}
 
-			return f.Table(headers, rows, []outfmt.ColumnType{
+			return out.Table(headers, rows, []outfmt.ColumnType{
 				outfmt.ColumnID,
 				outfmt.ColumnPlain,
 				outfmt.ColumnPlain,

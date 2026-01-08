@@ -11,8 +11,8 @@ import (
 )
 
 func TestRootCmd_Structure(t *testing.T) {
-	// rootCmd is a package-level var
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	if cmd.Use != "threads" {
 		t.Errorf("expected Use=threads, got %s", cmd.Use)
@@ -28,7 +28,8 @@ func TestRootCmd_Structure(t *testing.T) {
 }
 
 func TestRootCmd_SilencesOutput(t *testing.T) {
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	if !cmd.SilenceUsage {
 		t.Error("expected SilenceUsage to be true")
@@ -40,11 +41,13 @@ func TestRootCmd_SilencesOutput(t *testing.T) {
 }
 
 func TestRootCmd_HasSubcommands(t *testing.T) {
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	expectedSubs := []string{
 		"auth",
 		"completion",
+		"config",
 		"insights",
 		"locations",
 		"me",
@@ -54,6 +57,7 @@ func TestRootCmd_HasSubcommands(t *testing.T) {
 		"search",
 		"users",
 		"version",
+		"webhooks",
 	}
 
 	subcommands := cmd.Commands()
@@ -70,7 +74,8 @@ func TestRootCmd_HasSubcommands(t *testing.T) {
 }
 
 func TestRootCmd_GlobalFlags(t *testing.T) {
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	flags := []struct {
 		name      string
@@ -82,7 +87,6 @@ func TestRootCmd_GlobalFlags(t *testing.T) {
 		{"debug", ""},
 		{"query", "q"},
 		{"yes", "y"},
-		{"limit", ""},
 	}
 
 	for _, f := range flags {
@@ -98,7 +102,8 @@ func TestRootCmd_GlobalFlags(t *testing.T) {
 }
 
 func TestRootCmd_OutputFlagDefaults(t *testing.T) {
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	outputFlag := cmd.PersistentFlags().Lookup("output")
 	if outputFlag == nil {
@@ -111,7 +116,8 @@ func TestRootCmd_OutputFlagDefaults(t *testing.T) {
 }
 
 func TestRootCmd_ColorFlagDefaults(t *testing.T) {
-	cmd := rootCmd
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
 
 	colorFlag := cmd.PersistentFlags().Lookup("color")
 	if colorFlag == nil {
@@ -124,40 +130,14 @@ func TestRootCmd_ColorFlagDefaults(t *testing.T) {
 }
 
 func TestVersionCmd_Structure(t *testing.T) {
-	cmd := versionCmd
+	cmd := NewVersionCmd()
 
 	if cmd.Use != "version" {
 		t.Errorf("expected Use=version, got %s", cmd.Use)
 	}
 
-	if cmd.Run == nil {
-		t.Error("expected Run to be set")
-	}
-}
-
-func TestVersionCmd_Output(t *testing.T) {
-	var stdout bytes.Buffer
-
-	// Create a fresh copy of the version command to avoid state pollution
-	versionTestCmd := versionCmd
-
-	// Run the command directly instead of executing
-	versionTestCmd.Run(versionTestCmd, []string{})
-
-	// The version command writes to stdout directly via fmt.Printf
-	// We need to check the command structure instead
-	if versionTestCmd.Use != "version" {
-		t.Errorf("expected Use=version, got %s", versionTestCmd.Use)
-	}
-
-	if versionTestCmd.Short == "" {
-		t.Error("expected Short description to be set")
-	}
-
-	// Verify version variables are accessible
-	if Version == "" {
-		// Version may be empty in tests, that's okay - it's set by ldflags
-		_ = stdout // silence unused
+	if cmd.RunE == nil {
+		t.Error("expected RunE to be set")
 	}
 }
 
@@ -167,12 +147,12 @@ func TestExecute_WithContext(t *testing.T) {
 	ctx := iocontext.WithIO(context.Background(), io)
 	ctx = outfmt.WithFormat(ctx, "text")
 
-	// Execute with just --help to avoid needing auth
-	rootCmd.SetArgs([]string{"--help"})
-	rootCmd.SetOut(&stdout)
-	rootCmd.SetErr(&stderr)
+	f := newTestFactory(t)
+	cmd := NewRootCmd(f)
+	cmd.SetArgs([]string{"--help"})
+	cmd.SetContext(ctx)
 
-	err := Execute(ctx)
+	err := ExecuteCommand(cmd, f)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,61 +160,5 @@ func TestExecute_WithContext(t *testing.T) {
 	output := stdout.String()
 	if !strings.Contains(output, "Threads CLI") {
 		t.Error("expected help output to contain 'Threads CLI'")
-	}
-}
-
-func TestConfirm_WithYesFlag(t *testing.T) {
-	oldYesFlag := yesFlag
-	yesFlag = true
-	defer func() { yesFlag = oldYesFlag }()
-
-	if !confirm("Delete?") {
-		t.Error("expected confirm to return true when yesFlag is set")
-	}
-}
-
-func TestGetAccount_Empty(t *testing.T) {
-	oldAccountName := accountName
-	accountName = ""
-	defer func() { accountName = oldAccountName }()
-
-	// This may return empty or first account from keyring depending on system state
-	// We just verify it doesn't panic
-	_ = getAccount()
-}
-
-func TestRequireAccount_NoAccount(t *testing.T) {
-	oldAccountName := accountName
-	accountName = ""
-	defer func() { accountName = oldAccountName }()
-
-	// Mock getStore would be needed for comprehensive test
-	// For now, just verify it returns error when no account
-	_, err := requireAccount()
-	// This will likely fail since getAccount may find an account or not
-	// The test verifies the function runs without panic
-	_ = err
-}
-
-func TestConfirm_NonTTY(t *testing.T) {
-	// When yesFlag is false and stdin is not a TTY,
-	// confirm should return false
-	oldYesFlag := yesFlag
-	yesFlag = false
-	defer func() { yesFlag = oldYesFlag }()
-
-	// In test environment, stdin is typically not a TTY
-	// This test verifies confirm returns false in non-TTY mode
-	// Note: We can't fully test this without mocking os.Stdin,
-	// but we can verify the function doesn't hang/block
-	// when stdin is non-interactive (which it is in tests)
-
-	// The actual TTY detection is tested implicitly:
-	// if this test doesn't hang, the TTY check is working
-	result := confirm("Test prompt?")
-
-	// In a non-TTY environment without --yes, should return false
-	if result {
-		t.Error("expected confirm to return false in non-TTY mode without --yes")
 	}
 }

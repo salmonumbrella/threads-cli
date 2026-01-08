@@ -1,74 +1,123 @@
 package ui
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/muesli/termenv"
+
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
+	"github.com/salmonumbrella/threads-go/internal/outfmt"
 )
 
-var (
-	output = termenv.NewOutput(os.Stdout)
-	// Colors
-	Green  = output.Color("#22c55e")
-	Red    = output.Color("#ef4444")
-	Yellow = output.Color("#eab308")
-	Blue   = output.Color("#3b82f6")
-	Gray   = output.Color("#6b7280")
-	Cyan   = output.Color("#06b6d4")
-)
+// Printer provides styled, context-aware output.
+type Printer struct {
+	out    io.Writer
+	errOut io.Writer
+	output *termenv.Output
 
-// Success prints a success message
-func Success(format string, args ...any) {
+	Green  termenv.Color
+	Red    termenv.Color
+	Yellow termenv.Color
+	Blue   termenv.Color
+	Gray   termenv.Color
+	Cyan   termenv.Color
+}
+
+// New creates a Printer for the given IO and color mode.
+func New(io *iocontext.IO, colorMode outfmt.ColorMode) *Printer {
+	out := io.Out
+	errOut := io.ErrOut
+	if out == nil {
+		out = os.Stdout
+	}
+	if errOut == nil {
+		errOut = os.Stderr
+	}
+
+	opts := []termenv.OutputOption{}
+	switch colorMode {
+	case outfmt.ColorAlways:
+		opts = append(opts, termenv.WithUnsafe())
+	case outfmt.ColorNever:
+		opts = append(opts, termenv.WithProfile(termenv.Ascii))
+	}
+
+	output := termenv.NewOutput(out, opts...)
+
+	return &Printer{
+		out:    out,
+		errOut: errOut,
+		output: output,
+		Green:  output.Color("#22c55e"),
+		Red:    output.Color("#ef4444"),
+		Yellow: output.Color("#eab308"),
+		Blue:   output.Color("#3b82f6"),
+		Gray:   output.Color("#6b7280"),
+		Cyan:   output.Color("#06b6d4"),
+	}
+}
+
+// FromContext creates a Printer from context.
+func FromContext(ctx context.Context) *Printer {
+	io := iocontext.GetIO(ctx)
+	colorMode := outfmt.GetColorMode(ctx)
+	return New(io, colorMode)
+}
+
+// Success prints a success message.
+func (p *Printer) Success(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Println(output.String("✓ ").Foreground(Green).String() + msg)
+	fmt.Fprintln(p.out, p.output.String("✓ ").Foreground(p.Green).String()+msg) //nolint:errcheck // Best-effort output
 }
 
-// Error prints an error message
-func Error(format string, args ...any) {
+// Error prints an error message.
+func (p *Printer) Error(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintln(os.Stderr, output.String("✗ ").Foreground(Red).String()+msg)
+	fmt.Fprintln(p.errOut, p.output.String("✗ ").Foreground(p.Red).String()+msg) //nolint:errcheck // Best-effort output
 }
 
-// Warning prints a warning message
-func Warning(format string, args ...any) {
+// Warning prints a warning message.
+func (p *Printer) Warning(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Println(output.String("⚠ ").Foreground(Yellow).String() + msg)
+	fmt.Fprintln(p.out, p.output.String("⚠ ").Foreground(p.Yellow).String()+msg) //nolint:errcheck // Best-effort output
 }
 
-// Info prints an info message
-func Info(format string, args ...any) {
+// Info prints an info message.
+func (p *Printer) Info(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Println(output.String("ℹ ").Foreground(Blue).String() + msg)
+	fmt.Fprintln(p.out, p.output.String("ℹ ").Foreground(p.Blue).String()+msg) //nolint:errcheck // Best-effort output
 }
 
-// Bold returns bold text
-func Bold(s string) string {
-	return output.String(s).Bold().String()
+// Bold returns bold text.
+func (p *Printer) Bold(s string) string {
+	return p.output.String(s).Bold().String()
 }
 
-// Dim returns dimmed text
-func Dim(s string) string {
-	return output.String(s).Faint().String()
+// Dim returns dimmed text.
+func (p *Printer) Dim(s string) string {
+	return p.output.String(s).Faint().String()
 }
 
-// Colorize returns colored text
-func Colorize(s string, color termenv.Color) string {
-	return output.String(s).Foreground(color).String()
+// Colorize returns colored text.
+func (p *Printer) Colorize(s string, color termenv.Color) string {
+	return p.output.String(s).Foreground(color).String()
 }
 
-// StatusColor returns appropriate color for a status
-func StatusColor(status string) termenv.Color {
+// StatusColor returns appropriate color for a status.
+func (p *Printer) StatusColor(status string) termenv.Color {
 	switch status {
 	case "active", "valid", "published", "success":
-		return Green
+		return p.Green
 	case "expired", "error", "failed":
-		return Red
+		return p.Red
 	case "pending", "processing":
-		return Yellow
+		return p.Yellow
 	default:
-		return Gray
+		return p.Gray
 	}
 }
 
@@ -146,5 +195,6 @@ func formatRelativeTimeFrom(t, now time.Time) string {
 
 // IsTerminal checks if stdout is a terminal
 func IsTerminal() bool {
+	output := termenv.NewOutput(os.Stdout)
 	return output.Profile != termenv.Ascii
 }

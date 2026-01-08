@@ -6,28 +6,31 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
 )
 
-func newRateLimitCmd() *cobra.Command {
+// NewRateLimitCmd builds the ratelimit command group.
+func NewRateLimitCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "ratelimit",
 		Aliases: []string{"rate", "limits"},
 		Short:   "View rate limit status",
 	}
 
-	cmd.AddCommand(newRateLimitStatusCmd())
-	cmd.AddCommand(newRateLimitPublishingCmd())
+	cmd.AddCommand(newRateLimitStatusCmd(f))
+	cmd.AddCommand(newRateLimitPublishingCmd(f))
 
 	return cmd
 }
 
-func newRateLimitStatusCmd() *cobra.Command {
+func newRateLimitStatusCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current rate limit status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := getClient(cmd.Context())
+			ctx := cmd.Context()
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
@@ -36,24 +39,25 @@ func newRateLimitStatusCmd() *cobra.Command {
 			isLimited := client.IsRateLimited()
 			nearLimit := client.IsNearRateLimit(0.8)
 
-			if outfmt.IsJSON(cmd.Context()) {
-				return outfmt.WriteJSON(map[string]interface{}{
+			io := iocontext.GetIO(ctx)
+			if outfmt.IsJSON(ctx) {
+				return outfmt.WriteJSONTo(io.Out, map[string]interface{}{
 					"is_limited": isLimited,
 					"remaining":  status.Remaining,
 					"limit":      status.Limit,
 					"reset_at":   status.ResetTime,
 					"reset_in":   status.ResetIn.String(),
 					"near_limit": nearLimit,
-				}, jqQuery)
+				}, outfmt.GetQuery(ctx))
 			}
 
 			// Text output
 			if isLimited {
-				fmt.Printf("Rate limited until %s\n", status.ResetTime.Format(time.RFC3339))
+				fmt.Fprintf(io.Out, "Rate limited until %s\n", status.ResetTime.Format(time.RFC3339)) //nolint:errcheck // Best-effort output
 			} else {
-				fmt.Printf("Remaining: %d/%d\n", status.Remaining, status.Limit)
+				fmt.Fprintf(io.Out, "Remaining: %d/%d\n", status.Remaining, status.Limit) //nolint:errcheck // Best-effort output
 				if nearLimit {
-					fmt.Println("Warning: Near rate limit threshold")
+					fmt.Fprintln(io.Out, "Warning: Near rate limit threshold") //nolint:errcheck // Best-effort output
 				}
 			}
 
@@ -63,27 +67,29 @@ func newRateLimitStatusCmd() *cobra.Command {
 	return cmd
 }
 
-func newRateLimitPublishingCmd() *cobra.Command {
+func newRateLimitPublishingCmd(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "publishing",
 		Short: "Show publishing limits (API quota)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := getClient(cmd.Context())
+			ctx := cmd.Context()
+			client, err := f.Client(ctx)
 			if err != nil {
 				return err
 			}
 
-			limits, err := client.GetPublishingLimits(cmd.Context())
+			limits, err := client.GetPublishingLimits(ctx)
 			if err != nil {
 				return WrapError("failed to get publishing limits", err)
 			}
 
-			if outfmt.IsJSON(cmd.Context()) {
-				return outfmt.WriteJSON(limits, jqQuery)
+			io := iocontext.GetIO(ctx)
+			if outfmt.IsJSON(ctx) {
+				return outfmt.WriteJSONTo(io.Out, limits, outfmt.GetQuery(ctx))
 			}
 
 			// Text output
-			fmt.Printf("%v\n", limits)
+			fmt.Fprintf(io.Out, "%v\n", limits) //nolint:errcheck // Best-effort output
 			return nil
 		},
 	}

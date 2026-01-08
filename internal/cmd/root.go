@@ -6,11 +6,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
-	"github.com/salmonumbrella/threads-go/internal/secrets"
 )
 
 var (
@@ -20,22 +18,69 @@ var (
 	BuildDate = "unknown"
 )
 
-// Global flags
-var (
-	accountName  string
-	outputFormat string
-	colorMode    string
-	debugMode    bool
-	jqQuery      string
-	yesFlag      bool
-	limitFlag    int
-)
+// RootOptions captures global flags.
+type RootOptions struct {
+	Account string
+	Output  string
+	Color   string
+	Debug   bool
+	Query   string
+	Yes     bool
+}
 
-// rootCmd is the base command
-var rootCmd = &cobra.Command{
-	Use:   "threads",
-	Short: "Threads CLI - Interact with Meta Threads from the command line",
-	Long: `Threads CLI is a command-line interface for Meta's Threads API.
+// Execute runs the CLI with a new factory and root command.
+func Execute(ctx context.Context) error {
+	f, err := NewFactory(ctx, FactoryOptions{})
+	if err != nil {
+		return err
+	}
+
+	cmd := NewRootCmd(f)
+	cmd.SetContext(ctx)
+	return ExecuteCommand(cmd, f)
+}
+
+// ExecuteCommand runs a prepared command and handles formatted errors.
+func ExecuteCommand(cmd *cobra.Command, f *Factory) error {
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+
+	io := iocontext.GetIO(cmd.Context())
+	if io != nil {
+		cmd.SetOut(io.Out)
+		cmd.SetErr(io.ErrOut)
+	} else if f != nil && f.IO != nil {
+		cmd.SetOut(f.IO.Out)
+		cmd.SetErr(f.IO.ErrOut)
+	}
+
+	err := cmd.Execute()
+	if err != nil {
+		formatted := FormatError(err)
+		if io == nil && f != nil {
+			io = f.IO
+		}
+		if io == nil {
+			io = iocontext.DefaultIO()
+		}
+		fmt.Fprintln(io.ErrOut, formatted.Error()) //nolint:errcheck // Best-effort output
+	}
+	return err
+}
+
+// NewRootCmd constructs the root command and wires subcommands.
+func NewRootCmd(f *Factory) *cobra.Command {
+	opts := &RootOptions{
+		Account: f.Config.Account,
+		Output:  f.Config.Output,
+		Color:   f.Config.Color,
+		Debug:   f.Config.Debug,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "threads",
+		Short: "Threads CLI - Interact with Meta Threads from the command line",
+		Long: `Threads CLI is a command-line interface for Meta's Threads API.
 
 It provides full access to Threads functionality including:
   - Creating and managing posts (text, images, videos, carousels)
@@ -45,138 +90,106 @@ It provides full access to Threads functionality including:
   - Searching content
 
 Designed to be agent-friendly for automation with Claude and other AI assistants.`,
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 
-		// Inject IO context (if not already set for testing)
-		if !iocontext.HasIO(ctx) {
-			ctx = iocontext.WithIO(ctx, iocontext.DefaultIO())
-		}
+			if !iocontext.HasIO(ctx) {
+				ctx = iocontext.WithIO(ctx, f.IO)
+			}
 
-		// Set up output format context
-		format := outfmt.Text
-		if outputFormat == "json" {
-			format = outfmt.JSON
-		}
-		ctx = outfmt.NewContext(ctx, format)
+			output := f.Config.Output
+			if cmd.Flags().Changed("output") {
+				output = opts.Output
+			}
+			if output == "" {
+				output = "text"
+			}
+			if output != "text" && output != "json" {
+				return &UserFriendlyError{
+					Message:    fmt.Sprintf("Invalid output value: %s", output),
+					Suggestion: "Valid values are: text, json",
+				}
+			}
 
-		// Add additional context values
-		ctx = outfmt.WithQuery(ctx, jqQuery)
-		ctx = outfmt.WithYes(ctx, yesFlag)
-		ctx = outfmt.WithLimit(ctx, limitFlag)
+			color := f.Config.Color
+			if cmd.Flags().Changed("color") {
+				color = opts.Color
+			}
+			if color == "" {
+				color = "auto"
+			}
+			if os.Getenv("NO_COLOR") != "" && !cmd.Flags().Changed("color") {
+				color = "never"
+			}
+			if color != "auto" && color != "always" && color != "never" {
+				return &UserFriendlyError{
+					Message:    fmt.Sprintf("Invalid color value: %s", color),
+					Suggestion: "Valid values are: auto, always, never",
+				}
+			}
 
-		cmd.SetContext(ctx)
-		return nil
-	},
+			debug := f.Config.Debug
+			if cmd.Flags().Changed("debug") {
+				debug = opts.Debug
+			}
+
+			account := f.Config.Account
+			if cmd.Flags().Changed("account") {
+				account = opts.Account
+			}
+
+			f.Output = outfmt.ParseFormat(output)
+			f.ColorMode = outfmt.ParseColorMode(color)
+			f.Debug = debug
+			f.Account = account
+
+			ctx = outfmt.NewContext(ctx, f.Output)
+			ctx = outfmt.WithQuery(ctx, opts.Query)
+			ctx = outfmt.WithYes(ctx, opts.Yes)
+			ctx = outfmt.WithColorMode(ctx, f.ColorMode)
+			cmd.SetContext(ctx)
+
+			return nil
+		},
+	}
+
+	cmd.PersistentFlags().StringVarP(&opts.Account, "account", "a", opts.Account, "Account name to use (or set THREADS_ACCOUNT)")
+	cmd.PersistentFlags().StringVarP(&opts.Output, "output", "o", opts.Output, "Output format: text, json")
+	cmd.PersistentFlags().StringVar(&opts.Color, "color", opts.Color, "Color output: auto, always, never")
+	cmd.PersistentFlags().BoolVar(&opts.Debug, "debug", opts.Debug, "Enable debug output")
+	cmd.PersistentFlags().StringVarP(&opts.Query, "query", "q", "", "JQ query to filter JSON output")
+	cmd.PersistentFlags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompts")
+
+	cmd.AddCommand(NewAuthCmd(f))
+	cmd.AddCommand(NewCompletionCmd())
+	cmd.AddCommand(NewInsightsCmd(f))
+	cmd.AddCommand(NewLocationsCmd(f))
+	cmd.AddCommand(NewUsersMeCmd(f))
+	cmd.AddCommand(NewPostsCmd(f))
+	cmd.AddCommand(NewRateLimitCmd(f))
+	cmd.AddCommand(NewRepliesCmd(f))
+	cmd.AddCommand(NewSearchCmd(f))
+	cmd.AddCommand(NewUsersCmd(f))
+	cmd.AddCommand(NewVersionCmd())
+	cmd.AddCommand(NewWebhooksCmd(f))
+	cmd.AddCommand(NewConfigCmd(f))
+
+	return cmd
 }
 
-// Execute runs the root command
-func Execute(ctx context.Context) error {
-	rootCmd.SetContext(ctx)
-	return rootCmd.Execute()
-}
-
-func init() {
-	// Global flags
-	rootCmd.PersistentFlags().StringVarP(&accountName, "account", "a", "", "Account name to use (or set THREADS_ACCOUNT)")
-	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "text", "Output format: text, json")
-	rootCmd.PersistentFlags().StringVar(&colorMode, "color", "auto", "Color output: auto, always, never")
-	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "Enable debug output")
-	rootCmd.PersistentFlags().StringVarP(&jqQuery, "query", "q", "", "JQ query to filter JSON output")
-	rootCmd.PersistentFlags().BoolVarP(&yesFlag, "yes", "y", false, "Skip confirmation prompts")
-	rootCmd.PersistentFlags().IntVar(&limitFlag, "limit", 0, "Limit number of results")
-
-	// Environment variable fallbacks
-	if accountName == "" {
-		accountName = os.Getenv("THREADS_ACCOUNT")
+// NewVersionCmd shows version information.
+func NewVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Show version information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			io := iocontext.GetIO(cmd.Context())
+			fmt.Fprintf(io.Out, "threads %s\n", Version)     //nolint:errcheck // Best-effort output
+			fmt.Fprintf(io.Out, "  commit: %s\n", Commit)    //nolint:errcheck // Best-effort output
+			fmt.Fprintf(io.Out, "  built:  %s\n", BuildDate) //nolint:errcheck // Best-effort output
+			return nil
+		},
 	}
-	if os.Getenv("THREADS_OUTPUT") != "" {
-		outputFormat = os.Getenv("THREADS_OUTPUT")
-	}
-	if os.Getenv("NO_COLOR") != "" {
-		colorMode = "never"
-	}
-
-	// Add subcommands
-	rootCmd.AddCommand(authCmd)
-	rootCmd.AddCommand(newCompletionCmd())
-	rootCmd.AddCommand(insightsCmd)
-	rootCmd.AddCommand(newLocationsCmd())
-	rootCmd.AddCommand(meCmd)
-	rootCmd.AddCommand(postsCmd)
-	rootCmd.AddCommand(newRateLimitCmd())
-	rootCmd.AddCommand(repliesCmd)
-	rootCmd.AddCommand(newSearchCmd())
-	rootCmd.AddCommand(usersCmd)
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(webhooksCmd)
-}
-
-// versionCmd shows version information
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show version information",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("threads %s\n", Version)
-		fmt.Printf("  commit: %s\n", Commit)
-		fmt.Printf("  built:  %s\n", BuildDate)
-	},
-}
-
-// getStore returns the credential store
-func getStore() (*secrets.KeyringStore, error) {
-	return secrets.OpenDefault()
-}
-
-// getAccount returns the active account name
-func getAccount() string {
-	if accountName != "" {
-		return accountName
-	}
-	// Try to find a default account
-	store, err := getStore()
-	if err != nil {
-		return ""
-	}
-	accounts, err := store.List()
-	if err != nil || len(accounts) == 0 {
-		return ""
-	}
-	// Return first account as default
-	return accounts[0]
-}
-
-// requireAccount ensures an account is selected
-func requireAccount() (string, error) {
-	account := getAccount()
-	if account == "" {
-		return "", &UserFriendlyError{
-			Message:    "No Threads account configured",
-			Suggestion: "Run 'threads auth login' to authenticate with your Threads account",
-		}
-	}
-	return account, nil
-}
-
-// confirm prompts for confirmation unless --yes is set.
-// Returns false with an error message if stdin is not a TTY.
-func confirm(prompt string) bool {
-	if yesFlag {
-		return true
-	}
-
-	// Check if stdin is a terminal
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		fmt.Fprintln(os.Stderr, "error: cannot prompt for confirmation (stdin is not a terminal)")
-		fmt.Fprintln(os.Stderr, "hint: use --yes (-y) to skip confirmation in non-interactive mode")
-		return false
-	}
-
-	fmt.Printf("%s [y/N]: ", prompt)
-	var response string
-	//nolint:errcheck,gosec // Scanln error is fine - empty response means "no"
-	fmt.Scanln(&response)
-	return response == "y" || response == "Y" || response == "yes"
 }

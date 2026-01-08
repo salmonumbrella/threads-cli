@@ -1,29 +1,25 @@
 package cmd
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestLocationsCmd_Structure(t *testing.T) {
-	cmd := newLocationsCmd()
+	f := newTestFactory(t)
+	cmd := NewLocationsCmd(f)
 
 	if cmd.Use != "locations" {
 		t.Errorf("expected Use=locations, got %s", cmd.Use)
 	}
 
-	// Check aliases
 	expectedAliases := []string{"location", "loc"}
 	if len(cmd.Aliases) != len(expectedAliases) {
 		t.Errorf("expected %d aliases, got %d", len(expectedAliases), len(cmd.Aliases))
 	}
 
-	// Check subcommands
 	subcommands := cmd.Commands()
 	if len(subcommands) != 2 {
 		t.Errorf("expected 2 subcommands, got %d", len(subcommands))
 	}
 
-	// Verify subcommand names
 	names := make(map[string]bool)
 	for _, sub := range subcommands {
 		names[sub.Use] = true
@@ -37,7 +33,8 @@ func TestLocationsCmd_Structure(t *testing.T) {
 }
 
 func TestLocationsSearchCmd_Flags(t *testing.T) {
-	cmd := newLocationsSearchCmd()
+	f := newTestFactory(t)
+	cmd := newLocationsSearchCmd(f)
 
 	flags := []string{"lat", "lng"}
 	for _, flag := range flags {
@@ -48,7 +45,8 @@ func TestLocationsSearchCmd_Flags(t *testing.T) {
 }
 
 func TestLocationsGetCmd_RequiresArg(t *testing.T) {
-	cmd := newLocationsGetCmd()
+	f := newTestFactory(t)
+	cmd := newLocationsGetCmd(f)
 
 	if cmd.Args == nil {
 		t.Error("expected Args validator")

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
@@ -10,112 +9,83 @@ import (
 
 	threads "github.com/salmonumbrella/threads-go"
 	"github.com/salmonumbrella/threads-go/internal/auth"
+	"github.com/salmonumbrella/threads-go/internal/iocontext"
 	"github.com/salmonumbrella/threads-go/internal/outfmt"
 	"github.com/salmonumbrella/threads-go/internal/secrets"
 	"github.com/salmonumbrella/threads-go/internal/ui"
 )
 
-var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Manage authentication",
-	Long:  `Authenticate with Threads and manage stored credentials.`,
+var defaultAuthScopes = []string{
+	"threads_basic",
+	"threads_content_publish",
+	"threads_manage_insights",
+	"threads_manage_replies",
+	"threads_read_replies",
 }
 
-var authLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate with Threads via browser",
-	Long: `Opens a browser to authenticate with Threads using OAuth 2.0.
+// NewAuthCmd builds the auth command group.
+func NewAuthCmd(f *Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Manage authentication",
+		Long:  `Authenticate with Threads and manage stored credentials.`,
+	}
+
+	cmd.AddCommand(newAuthLoginCmd(f))
+	cmd.AddCommand(newAuthTokenCmd(f))
+	cmd.AddCommand(newAuthRefreshCmd(f))
+	cmd.AddCommand(newAuthStatusCmd(f))
+	cmd.AddCommand(newAuthListCmd(f))
+	cmd.AddCommand(newAuthRemoveCmd(f))
+
+	return cmd
+}
+
+type authLoginOptions struct {
+	Name         string
+	ClientID     string
+	ClientSecret string
+	RedirectURI  string
+	Scopes       []string
+}
+
+func newAuthLoginCmd(f *Factory) *cobra.Command {
+	opts := &authLoginOptions{
+		Name:   "default",
+		Scopes: append([]string{}, defaultAuthScopes...),
+	}
+
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Authenticate with Threads via browser",
+		Long: `Opens a browser to authenticate with Threads using OAuth 2.0.
 
 After authentication, your credentials are securely stored in the system keychain.
 Tokens are automatically converted to long-lived tokens (60 days).`,
-	RunE: runAuthLogin,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthLogin(cmd, f, opts)
+		},
+	}
+
+	cmd.Flags().StringVarP(&opts.Name, "name", "n", "default", "Account name for this login")
+	cmd.Flags().StringVar(&opts.ClientID, "client-id", "", "Meta App Client ID (or THREADS_CLIENT_ID)")
+	cmd.Flags().StringVar(&opts.ClientSecret, "client-secret", "", "Meta App Client Secret (or THREADS_CLIENT_SECRET)")
+	cmd.Flags().StringVar(&opts.RedirectURI, "redirect-uri", "", "OAuth Redirect URI (or THREADS_REDIRECT_URI)")
+	cmd.Flags().StringSliceVar(&opts.Scopes, "scopes", opts.Scopes, "OAuth scopes to request")
+
+	return cmd
 }
 
-var authTokenCmd = &cobra.Command{
-	Use:   "token [access-token]",
-	Short: "Authenticate with an existing access token",
-	Long: `Use an existing access token to authenticate.
-
-You can provide the token as an argument or via THREADS_ACCESS_TOKEN environment variable.
-The CLI will validate the token and store it in your keychain.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runAuthToken,
-}
-
-var authRefreshCmd = &cobra.Command{
-	Use:   "refresh",
-	Short: "Refresh the access token",
-	Long:  `Refresh the current access token before it expires.`,
-	RunE:  runAuthRefresh,
-}
-
-var authStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show authentication status",
-	Long:  `Display the current authentication status and token expiry information.`,
-	RunE:  runAuthStatus,
-}
-
-var authListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List configured accounts",
-	RunE:  runAuthList,
-}
-
-var authRemoveCmd = &cobra.Command{
-	Use:   "remove [account]",
-	Short: "Remove a stored account",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runAuthRemove,
-}
-
-// Auth command flags
-var (
-	authAccountName  string
-	authClientID     string
-	authClientSecret string
-	authRedirectURI  string
-	authScopes       []string
-)
-
-func init() {
-	// Login flags
-	authLoginCmd.Flags().StringVarP(&authAccountName, "name", "n", "default", "Account name for this login")
-	authLoginCmd.Flags().StringVar(&authClientID, "client-id", "", "Meta App Client ID (or THREADS_CLIENT_ID)")
-	authLoginCmd.Flags().StringVar(&authClientSecret, "client-secret", "", "Meta App Client Secret (or THREADS_CLIENT_SECRET)")
-	authLoginCmd.Flags().StringVar(&authRedirectURI, "redirect-uri", "", "OAuth Redirect URI (or THREADS_REDIRECT_URI)")
-	authLoginCmd.Flags().StringSliceVar(&authScopes, "scopes", []string{
-		"threads_basic",
-		"threads_content_publish",
-		"threads_manage_insights",
-		"threads_manage_replies",
-		"threads_read_replies",
-	}, "OAuth scopes to request")
-
-	// Token flags
-	authTokenCmd.Flags().StringVarP(&authAccountName, "name", "n", "default", "Account name for this token")
-	authTokenCmd.Flags().StringVar(&authClientID, "client-id", "", "Meta App Client ID")
-	authTokenCmd.Flags().StringVar(&authClientSecret, "client-secret", "", "Meta App Client Secret")
-
-	authCmd.AddCommand(authLoginCmd)
-	authCmd.AddCommand(authTokenCmd)
-	authCmd.AddCommand(authRefreshCmd)
-	authCmd.AddCommand(authStatusCmd)
-	authCmd.AddCommand(authListCmd)
-	authCmd.AddCommand(authRemoveCmd)
-}
-
-func runAuthLogin(cmd *cobra.Command, args []string) error {
-	// Get credentials from flags or environment
-	clientID := authClientID
+func runAuthLogin(cmd *cobra.Command, f *Factory, opts *authLoginOptions) error {
+	clientID := opts.ClientID
 	if clientID == "" {
 		clientID = os.Getenv("THREADS_CLIENT_ID")
 	}
-	clientSecret := authClientSecret
+	clientSecret := opts.ClientSecret
 	if clientSecret == "" {
 		clientSecret = os.Getenv("THREADS_CLIENT_SECRET")
 	}
-	redirectURI := authRedirectURI
+	redirectURI := opts.RedirectURI
 	if redirectURI == "" {
 		redirectURI = os.Getenv("THREADS_REDIRECT_URI")
 	}
@@ -127,30 +97,28 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Default redirect URI for CLI OAuth
 	if redirectURI == "" {
 		redirectURI = "http://127.0.0.1:8585/callback"
 	}
 
-	store, err := getStore()
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
 	}
 
-	// Start OAuth server
-	server := auth.NewOAuthServer(clientID, clientSecret, redirectURI, authScopes)
+	ctx := cmd.Context()
+	p := f.UI(ctx)
+	p.Info("Starting authentication flow...")
+	p.Info("Opening browser for Threads authorization...")
 
-	ui.Info("Starting authentication flow...")
-	ui.Info("Opening browser for Threads authorization...")
-
-	result, err := server.Start(cmd.Context())
+	server := auth.NewOAuthServer(clientID, clientSecret, redirectURI, opts.Scopes)
+	result, err := server.Start(ctx)
 	if err != nil {
 		return WrapError("authentication failed", err)
 	}
 
-	// Store credentials
 	creds := secrets.Credentials{
-		Name:         authAccountName,
+		Name:         opts.Name,
 		AccessToken:  result.AccessToken,
 		UserID:       result.UserID,
 		Username:     result.Username,
@@ -161,19 +129,51 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		RedirectURI:  redirectURI,
 	}
 
-	if err := store.Set(authAccountName, creds); err != nil {
+	if err := store.Set(opts.Name, creds); err != nil {
 		return WrapError("failed to store credentials", err)
 	}
 
-	ui.Success("Authentication successful!")
-	fmt.Printf("  Account:  %s\n", authAccountName)
-	fmt.Printf("  User:     @%s\n", result.Username)
-	fmt.Printf("  Expires:  %s (%.0f days)\n", result.ExpiresAt.Format("2006-01-02"), time.Until(result.ExpiresAt).Hours()/24)
+	p.Success("Authentication successful!")
+	io := iocontext.GetIO(ctx)
+	fmt.Fprintf(io.Out, "  Account:  %s\n", opts.Name)                                                                                  //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  User:     @%s\n", result.Username)                                                                           //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Expires:  %s (%.0f days)\n", result.ExpiresAt.Format("2006-01-02"), time.Until(result.ExpiresAt).Hours()/24) //nolint:errcheck // Best-effort output
 
 	return nil
 }
 
-func runAuthToken(cmd *cobra.Command, args []string) error {
+type authTokenOptions struct {
+	Name         string
+	ClientID     string
+	ClientSecret string
+}
+
+func newAuthTokenCmd(f *Factory) *cobra.Command {
+	opts := &authTokenOptions{
+		Name: "default",
+	}
+
+	cmd := &cobra.Command{
+		Use:   "token [access-token]",
+		Short: "Authenticate with an existing access token",
+		Long: `Use an existing access token to authenticate.
+
+You can provide the token as an argument or via THREADS_ACCESS_TOKEN environment variable.
+The CLI will validate the token and store it in your keychain.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthToken(cmd, f, opts, args)
+		},
+	}
+
+	cmd.Flags().StringVarP(&opts.Name, "name", "n", "default", "Account name for this token")
+	cmd.Flags().StringVar(&opts.ClientID, "client-id", "", "Meta App Client ID")
+	cmd.Flags().StringVar(&opts.ClientSecret, "client-secret", "", "Meta App Client Secret")
+
+	return cmd
+}
+
+func runAuthToken(cmd *cobra.Command, f *Factory, opts *authTokenOptions, args []string) error {
 	var token string
 	if len(args) > 0 {
 		token = args[0]
@@ -188,26 +188,29 @@ func runAuthToken(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Get optional client credentials for token refresh capability
-	clientID := authClientID
+	clientID := opts.ClientID
 	if clientID == "" {
 		clientID = os.Getenv("THREADS_CLIENT_ID")
 	}
-	clientSecret := authClientSecret
+	clientSecret := opts.ClientSecret
 	if clientSecret == "" {
 		clientSecret = os.Getenv("THREADS_CLIENT_SECRET")
 	}
 
-	// Validate token by making API call
-	client, err := threads.NewClientWithToken(token, &threads.Config{
+	cfg := &threads.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-	})
+		Debug:        f.Debug,
+	}
+	if f.Debug {
+		cfg.Logger = f.logger()
+	}
+
+	client, err := f.NewClient(token, cfg)
 	if err != nil {
 		return WrapError("failed to create client", err)
 	}
 
-	// Debug token to get expiry info
 	ctx := cmd.Context()
 	debugInfo, err := client.DebugToken(ctx, "")
 	if err != nil {
@@ -221,20 +224,19 @@ func runAuthToken(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Get user info
 	user, err := client.GetMe(ctx)
 	if err != nil {
 		return WrapError("failed to get user info", err)
 	}
 
-	store, err := getStore()
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
 	}
 
 	expiresAt := time.Unix(debugInfo.Data.ExpiresAt, 0)
 	creds := secrets.Credentials{
-		Name:         authAccountName,
+		Name:         opts.Name,
 		AccessToken:  token,
 		UserID:       debugInfo.Data.UserID,
 		Username:     user.Username,
@@ -244,27 +246,50 @@ func runAuthToken(cmd *cobra.Command, args []string) error {
 		ClientSecret: clientSecret,
 	}
 
-	if err := store.Set(authAccountName, creds); err != nil {
+	if err := store.Set(opts.Name, creds); err != nil {
 		return WrapError("failed to store credentials", err)
 	}
 
-	ui.Success("Token stored successfully!")
-	fmt.Printf("  Account:  %s\n", authAccountName)
-	fmt.Printf("  User:     @%s\n", user.Username)
-	fmt.Printf("  Expires:  %s (%.0f days)\n", expiresAt.Format("2006-01-02"), time.Until(expiresAt).Hours()/24)
+	p := f.UI(ctx)
+	p.Success("Token stored successfully!")
+	io := iocontext.GetIO(ctx)
+	fmt.Fprintf(io.Out, "  Account:  %s\n", opts.Name)                                                                    //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  User:     @%s\n", user.Username)                                                               //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Expires:  %s (%.0f days)\n", expiresAt.Format("2006-01-02"), time.Until(expiresAt).Hours()/24) //nolint:errcheck // Best-effort output
 
 	return nil
 }
 
-func runAuthRefresh(cmd *cobra.Command, args []string) error {
-	account, err := requireAccount()
+func newAuthRefreshCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "refresh",
+		Short: "Refresh the access token",
+		Long:  `Refresh the current access token before it expires.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthRefresh(cmd, f)
+		},
+	}
+}
+
+func runAuthRefresh(cmd *cobra.Command, f *Factory) error {
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
 	}
 
-	store, err := getStore()
-	if err != nil {
-		return FormatError(err)
+	account := f.Account
+	if account == "" {
+		accounts, listErr := store.List()
+		if listErr != nil {
+			return FormatError(listErr)
+		}
+		if len(accounts) == 0 {
+			return &UserFriendlyError{
+				Message:    "No Threads account configured",
+				Suggestion: "Run 'threads auth login' to authenticate with your Threads account",
+			}
+		}
+		account = accounts[0]
 	}
 
 	creds, err := store.Get(account)
@@ -279,10 +304,16 @@ func runAuthRefresh(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := threads.NewClientWithToken(creds.AccessToken, &threads.Config{
+	cfg := &threads.Config{
 		ClientID:     creds.ClientID,
 		ClientSecret: creds.ClientSecret,
-	})
+		Debug:        f.Debug,
+	}
+	if f.Debug {
+		cfg.Logger = f.logger()
+	}
+
+	client, err := f.NewClient(creds.AccessToken, cfg)
 	if err != nil {
 		return WrapError("failed to create client", err)
 	}
@@ -292,7 +323,6 @@ func runAuthRefresh(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to refresh token", err)
 	}
 
-	// Get new token info
 	tokenInfo := client.GetTokenInfo()
 	creds.AccessToken = tokenInfo.AccessToken
 	creds.ExpiresAt = tokenInfo.ExpiresAt
@@ -301,24 +331,46 @@ func runAuthRefresh(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to update stored credentials", err)
 	}
 
-	ui.Success("Token refreshed successfully!")
-	fmt.Printf("  Account:  %s\n", account)
-	fmt.Printf("  Expires:  %s (%.0f days)\n", creds.ExpiresAt.Format("2006-01-02"), time.Until(creds.ExpiresAt).Hours()/24)
+	p := f.UI(ctx)
+	p.Success("Token refreshed successfully!")
+	io := iocontext.GetIO(ctx)
+	fmt.Fprintf(io.Out, "  Account:  %s\n", account)                                                                                  //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "  Expires:  %s (%.0f days)\n", creds.ExpiresAt.Format("2006-01-02"), time.Until(creds.ExpiresAt).Hours()/24) //nolint:errcheck // Best-effort output
 
 	return nil
 }
 
-func runAuthStatus(cmd *cobra.Command, args []string) error {
-	account := getAccount()
-	if account == "" {
-		ui.Warning("No account configured")
-		fmt.Println("\nRun 'threads auth login' to authenticate.")
-		return nil
+func newAuthStatusCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show authentication status",
+		Long:  `Display the current authentication status and token expiry information.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthStatus(cmd, f)
+		},
 	}
+}
 
-	store, err := getStore()
+func runAuthStatus(cmd *cobra.Command, f *Factory) error {
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
+	}
+
+	account := f.Account
+	if account == "" {
+		accounts, listErr := store.List()
+		if listErr != nil {
+			return FormatError(listErr)
+		}
+		if len(accounts) == 0 {
+			p := f.UI(cmd.Context())
+			p.Warning("No account configured")
+			io := iocontext.GetIO(cmd.Context())
+			fmt.Fprintln(io.Out, "\nRun 'threads auth login' to authenticate.") //nolint:errcheck // Best-effort output
+			return nil
+		}
+		account = accounts[0]
 	}
 
 	creds, err := store.Get(account)
@@ -327,43 +379,55 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
+	io := iocontext.GetIO(ctx)
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(map[string]any{
+		return outfmt.WriteJSONTo(io.Out, map[string]any{
 			"account":           account,
 			"user_id":           creds.UserID,
 			"username":          creds.Username,
 			"expires_at":        creds.ExpiresAt,
 			"is_expired":        creds.IsExpired(),
 			"days_until_expiry": creds.DaysUntilExpiry(),
-		}, jqQuery)
+		}, outfmt.GetQuery(ctx))
 	}
 
+	p := f.UI(ctx)
 	status := "active"
-	statusColor := ui.Green
+	statusColor := p.Green
 	if creds.IsExpired() {
 		status = "expired"
-		statusColor = ui.Red
+		statusColor = p.Red
 	} else if creds.IsExpiringSoon(7 * 24 * time.Hour) {
 		status = "expiring soon"
-		statusColor = ui.Yellow
+		statusColor = p.Yellow
 	}
 
-	fmt.Printf("Account:  %s\n", ui.Bold(account))
-	fmt.Printf("User:     @%s\n", creds.Username)
-	fmt.Printf("User ID:  %s\n", creds.UserID)
-	fmt.Printf("Status:   %s\n", ui.Colorize(status, statusColor))
+	fmt.Fprintf(io.Out, "Account:  %s\n", p.Bold(account))                 //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "User:     @%s\n", creds.Username)                 //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "User ID:  %s\n", creds.UserID)                    //nolint:errcheck // Best-effort output
+	fmt.Fprintf(io.Out, "Status:   %s\n", p.Colorize(status, statusColor)) //nolint:errcheck // Best-effort output
 
 	if !creds.ExpiresAt.IsZero() {
 		days := creds.DaysUntilExpiry()
-		fmt.Printf("Expires:  %s (%s)\n", creds.ExpiresAt.Format("2006-01-02 15:04"), ui.FormatDuration(days))
+		fmt.Fprintf(io.Out, "Expires:  %s (%s)\n", creds.ExpiresAt.Format("2006-01-02 15:04"), ui.FormatDuration(days)) //nolint:errcheck // Best-effort output
 	}
 
 	return nil
 }
 
-func runAuthList(cmd *cobra.Command, args []string) error {
-	store, err := getStore()
+func newAuthListCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List configured accounts",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthList(cmd, f)
+		},
+	}
+}
+
+func runAuthList(cmd *cobra.Command, f *Factory) error {
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
 	}
@@ -373,19 +437,20 @@ func runAuthList(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to list accounts", err)
 	}
 
+	ctx := cmd.Context()
+	io := iocontext.GetIO(ctx)
+
 	if len(accounts) == 0 {
-		ui.Info("No accounts configured")
-		fmt.Println("\nRun 'threads auth login' to authenticate.")
+		p := f.UI(ctx)
+		p.Info("No accounts configured")
+		fmt.Fprintln(io.Out, "\nRun 'threads auth login' to authenticate.") //nolint:errcheck // Best-effort output
 		return nil
 	}
-
-	ctx := cmd.Context()
 
 	if outfmt.IsJSON(ctx) {
 		var result []map[string]any
 		for _, name := range accounts {
-			//nolint:errcheck // Error means account not found, which we handle by checking creds != nil
-			creds, _ := store.Get(name)
+			creds, _ := store.Get(name) //nolint:errcheck // handled via nil check
 			if creds != nil {
 				result = append(result, map[string]any{
 					"name":       name,
@@ -396,16 +461,19 @@ func runAuthList(cmd *cobra.Command, args []string) error {
 				})
 			}
 		}
-		return outfmt.WriteJSON(result, jqQuery)
+		return outfmt.WriteJSONTo(io.Out, result, outfmt.GetQuery(ctx))
 	}
 
-	f := outfmt.NewFormatter()
-	f.Header("ACCOUNT", "USERNAME", "EXPIRES", "STATUS")
+	fmtr := outfmt.FromContext(ctx, outfmt.WithWriter(io.Out))
+	fmtr.Header("ACCOUNT", "USERNAME", "EXPIRES", "STATUS")
 
-	currentAccount := getAccount()
+	currentAccount := f.Account
+	if currentAccount == "" && len(accounts) > 0 {
+		currentAccount = accounts[0]
+	}
+
 	for _, name := range accounts {
-		//nolint:errcheck // Error means account not found, which we handle by checking creds == nil
-		creds, _ := store.Get(name)
+		creds, _ := store.Get(name) //nolint:errcheck // handled via nil check
 		if creds == nil {
 			continue
 		}
@@ -427,28 +495,37 @@ func runAuthList(cmd *cobra.Command, args []string) error {
 			expires = creds.ExpiresAt.Format("2006-01-02")
 		}
 
-		f.Row(displayName, "@"+creds.Username, expires, status)
+		fmtr.Row(displayName, "@"+creds.Username, expires, status)
 	}
-	f.Flush()
+	fmtr.Flush()
 
 	return nil
 }
 
-func runAuthRemove(cmd *cobra.Command, args []string) error {
-	name := args[0]
+func newAuthRemoveCmd(f *Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove [account]",
+		Short: "Remove a stored account",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAuthRemove(cmd, f, args[0])
+		},
+	}
+}
 
-	store, err := getStore()
+func runAuthRemove(cmd *cobra.Command, f *Factory, name string) error {
+	store, err := f.Store()
 	if err != nil {
 		return FormatError(err)
 	}
 
-	// Verify account exists
 	if _, err := store.Get(name); err != nil {
 		return FormatError(err)
 	}
 
-	if !confirm(fmt.Sprintf("Remove account %q?", name)) {
-		fmt.Println("Cancelled.")
+	if !f.Confirm(cmd.Context(), fmt.Sprintf("Remove account %q?", name)) {
+		io := iocontext.GetIO(cmd.Context())
+		fmt.Fprintln(io.Out, "Cancelled.") //nolint:errcheck // Best-effort output
 		return nil
 	}
 
@@ -456,44 +533,7 @@ func runAuthRemove(cmd *cobra.Command, args []string) error {
 		return WrapError("failed to remove account", err)
 	}
 
-	ui.Success("Account %q removed", name)
+	p := f.UI(cmd.Context())
+	p.Success("Account %q removed", name)
 	return nil
-}
-
-// getClient returns a Threads API client for the current account.
-// All errors are formatted with user-friendly messages and suggestions.
-//
-//nolint:unparam // ctx is required for interface consistency but not used internally
-func getClient(ctx context.Context) (*threads.Client, error) {
-	account, err := requireAccount()
-	if err != nil {
-		return nil, FormatError(err)
-	}
-
-	store, err := getStore()
-	if err != nil {
-		return nil, FormatError(err)
-	}
-
-	creds, err := store.Get(account)
-	if err != nil {
-		return nil, FormatError(err)
-	}
-
-	if creds.IsExpired() {
-		return nil, &UserFriendlyError{
-			Message:    "Your access token has expired",
-			Suggestion: "Run 'threads auth refresh' to get a new token, or 'threads auth login' to re-authenticate",
-		}
-	}
-
-	client, err := threads.NewClientWithToken(creds.AccessToken, &threads.Config{
-		ClientID:     creds.ClientID,
-		ClientSecret: creds.ClientSecret,
-	})
-	if err != nil {
-		return nil, WrapError("failed to create API client", err)
-	}
-
-	return client, nil
 }

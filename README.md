@@ -65,6 +65,21 @@ threads auth status
 
 ## Configuration
 
+Threads CLI supports a local config file. See the current path with:
+
+```bash
+threads config path
+```
+
+Common config commands:
+
+```bash
+threads config list
+threads config get output
+threads config set output json
+threads config set color always
+```
+
 ### Account Selection
 
 Specify the account using either a flag or environment variable:
@@ -86,6 +101,9 @@ threads posts list
 - `THREADS_ACCESS_TOKEN` - Access token (for token command)
 - `THREADS_ACCOUNT` - Default account name to use
 - `THREADS_OUTPUT` - Output format: `text` (default) or `json`
+- `THREADS_COLOR` - Color output: `auto` (default), `always`, `never`
+- `THREADS_DEBUG` - Enable debug logging (true/false)
+- `THREADS_CONFIG` - Path to config file (overrides default location)
 - `NO_COLOR` - Set to any value to disable colors
 
 ## Security

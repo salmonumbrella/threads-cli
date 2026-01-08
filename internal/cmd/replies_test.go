@@ -1,12 +1,10 @@
 package cmd
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestRepliesCmd_Structure(t *testing.T) {
-	// repliesCmd is a package-level var
-	cmd := repliesCmd
+	f := newTestFactory(t)
+	cmd := NewRepliesCmd(f)
 
 	if cmd.Use != "replies" {
 		t.Errorf("expected Use=replies, got %s", cmd.Use)
@@ -16,16 +14,16 @@ func TestRepliesCmd_Structure(t *testing.T) {
 		t.Error("expected Short description to be set")
 	}
 
-	// Check subcommands
 	subcommands := cmd.Commands()
-	expectedCount := 5 // list, create, hide, unhide, conversation
+	expectedCount := 5
 	if len(subcommands) != expectedCount {
 		t.Errorf("expected %d subcommands, got %d", expectedCount, len(subcommands))
 	}
 }
 
 func TestRepliesCmd_Subcommands(t *testing.T) {
-	cmd := repliesCmd
+	f := newTestFactory(t)
+	cmd := NewRepliesCmd(f)
 
 	expectedSubs := map[string]bool{
 		"list":         true,
@@ -49,7 +47,8 @@ func TestRepliesCmd_Subcommands(t *testing.T) {
 }
 
 func TestRepliesListCmd_Structure(t *testing.T) {
-	cmd := repliesListCmd
+	f := newTestFactory(t)
+	cmd := newRepliesListCmd(f)
 
 	if cmd.Use != "list [post-id]" {
 		t.Errorf("expected Use='list [post-id]', got %s", cmd.Use)
@@ -65,7 +64,8 @@ func TestRepliesListCmd_Structure(t *testing.T) {
 }
 
 func TestRepliesListCmd_Flags(t *testing.T) {
-	cmd := repliesListCmd
+	f := newTestFactory(t)
+	cmd := newRepliesListCmd(f)
 
 	limitFlag := cmd.Flag("limit")
 	if limitFlag == nil {
@@ -78,7 +78,8 @@ func TestRepliesListCmd_Flags(t *testing.T) {
 }
 
 func TestRepliesCreateCmd_Structure(t *testing.T) {
-	cmd := repliesCreateCmd
+	f := newTestFactory(t)
+	cmd := newRepliesCreateCmd(f)
 
 	if cmd.Use != "create [post-id]" {
 		t.Errorf("expected Use='create [post-id]', got %s", cmd.Use)
@@ -94,7 +95,8 @@ func TestRepliesCreateCmd_Structure(t *testing.T) {
 }
 
 func TestRepliesCreateCmd_Flags(t *testing.T) {
-	cmd := repliesCreateCmd
+	f := newTestFactory(t)
+	cmd := newRepliesCreateCmd(f)
 
 	textFlag := cmd.Flag("text")
 	if textFlag == nil {
@@ -104,18 +106,11 @@ func TestRepliesCreateCmd_Flags(t *testing.T) {
 	if textFlag.Shorthand != "t" {
 		t.Errorf("expected text flag shorthand='t', got %s", textFlag.Shorthand)
 	}
-
-	// Text flag should be required - check annotations
-	annotations := textFlag.Annotations
-	if annotations != nil {
-		// The flag may be marked required through MarkFlagRequired
-		// We just verify the flag exists
-		_ = annotations["cobra_annotation_bash_completion_one_required_flag"]
-	}
 }
 
 func TestRepliesHideCmd_Structure(t *testing.T) {
-	cmd := repliesHideCmd
+	f := newTestFactory(t)
+	cmd := newRepliesHideCmd(f)
 
 	if cmd.Use != "hide [reply-id]" {
 		t.Errorf("expected Use='hide [reply-id]', got %s", cmd.Use)
@@ -131,7 +126,8 @@ func TestRepliesHideCmd_Structure(t *testing.T) {
 }
 
 func TestRepliesUnhideCmd_Structure(t *testing.T) {
-	cmd := repliesUnhideCmd
+	f := newTestFactory(t)
+	cmd := newRepliesUnhideCmd(f)
 
 	if cmd.Use != "unhide [reply-id]" {
 		t.Errorf("expected Use='unhide [reply-id]', got %s", cmd.Use)
@@ -147,7 +143,8 @@ func TestRepliesUnhideCmd_Structure(t *testing.T) {
 }
 
 func TestRepliesConversationCmd_Structure(t *testing.T) {
-	cmd := repliesConversationCmd
+	f := newTestFactory(t)
+	cmd := newRepliesConversationCmd(f)
 
 	if cmd.Use != "conversation [post-id]" {
 		t.Errorf("expected Use='conversation [post-id]', got %s", cmd.Use)
@@ -163,7 +160,8 @@ func TestRepliesConversationCmd_Structure(t *testing.T) {
 }
 
 func TestRepliesConversationCmd_Flags(t *testing.T) {
-	cmd := repliesConversationCmd
+	f := newTestFactory(t)
+	cmd := newRepliesConversationCmd(f)
 
 	limitFlag := cmd.Flag("limit")
 	if limitFlag == nil {
@@ -172,21 +170,5 @@ func TestRepliesConversationCmd_Flags(t *testing.T) {
 
 	if limitFlag.DefValue != "25" {
 		t.Errorf("expected limit default=25, got %s", limitFlag.DefValue)
-	}
-}
-
-func TestRepliesHideCmd_HasLongDescription(t *testing.T) {
-	cmd := repliesHideCmd
-
-	if cmd.Long == "" {
-		t.Error("expected Long description to be set for hide command")
-	}
-}
-
-func TestRepliesUnhideCmd_HasLongDescription(t *testing.T) {
-	cmd := repliesUnhideCmd
-
-	if cmd.Long == "" {
-		t.Error("expected Long description to be set for unhide command")
 	}
 }

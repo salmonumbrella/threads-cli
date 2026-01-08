@@ -35,6 +35,12 @@ func FormatError(err error) error {
 		return nil
 	}
 
+	// Preserve already formatted errors.
+	var ufErr *UserFriendlyError
+	if errors.As(err, &ufErr) {
+		return ufErr
+	}
+
 	// Check for authentication errors
 	var authErr *threads.AuthenticationError
 	if errors.As(err, &authErr) {
